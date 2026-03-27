@@ -22,8 +22,7 @@ Estudantes e pessoas que vivem em repúblicas ou moradias compartilhadas.
 
 ## Documentação
 
-[Documentação Sprint 1](./docs/documentacao_sprint1.pdf)
-
+[Documentação Sprint 1](./documentacao_sprint1.pdf)
 ---
 
 ## Equipe
