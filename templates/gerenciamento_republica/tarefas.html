@@ -1,0 +1,83 @@
+{% extends "gerenciamento_republica/base_app.html" %}
+
+{% block title %}Tarefas - RABBU{% endblock %}
+{% block page_icon %}<i class="fa-solid fa-broom"></i>{% endblock %}
+{% block page_title %}Tarefas{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; gap:15px; flex-wrap:wrap;">
+  <p style="color: var(--text-muted); font-size: 0.9em">
+    <i class="fa-solid fa-circle-info"></i> Arraste os cartoes ou use o botao Concluir para atualizar o status das tarefas.
+  </p>
+  <button class="btn btn-outline btn-sm" data-open-modal="modal-nova-tarefa">
+    <i class="fa-solid fa-plus"></i> Adicionar tarefa
+  </button>
+</div>
+
+<div class="kanban-board" id="tarefas-board">
+  <div class="kanban-column" data-status="PENDENTE" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event)">
+    <div class="kanban-header">Pendentes</div>
+    <div class="kanban-body" id="tarefas-pendente-list"></div>
+  </div>
+  <div class="kanban-column" data-status="EM_ANDAMENTO" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event)">
+    <div class="kanban-header">Em andamento</div>
+    <div class="kanban-body" id="tarefas-andamento-list"></div>
+  </div>
+  <div class="kanban-column" data-status="CONCLUIDA" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event)">
+    <div class="kanban-header">Concluidas</div>
+    <div class="kanban-body" id="tarefas-concluida-list"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div class="modal-overlay" id="modal-nova-tarefa">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="margin: 0"><i class="fa-solid fa-broom" style="color: var(--info)"></i> Nova tarefa</h3>
+      <button class="btn-outline" style="border: none; font-size: 1.5em; padding: 0" data-close-modal="modal-nova-tarefa">x</button>
+    </div>
+    <form id="tarefa-form">
+      <div class="form-group">
+        <label>O que precisa ser feito?</label>
+        <input type="text" name="titulo" class="form-control" placeholder="Ex: Tirar o lixo" required />
+      </div>
+      <div class="form-group">
+        <label>Descricao</label>
+        <input type="text" name="descricao" class="form-control" placeholder="Detalhes opcionais" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Responsavel</label>
+          <select name="responsavel" class="form-control" id="tarefa-responsavel">
+            <option value="">Sem responsavel</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prioridade</label>
+          <select name="prioridade" class="form-control">
+            <option value="BAIXA">Baixa</option>
+            <option value="MEDIA" selected>Media</option>
+            <option value="ALTA">Alta</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Status inicial</label>
+          <select name="status" class="form-control">
+            <option value="PENDENTE">Pendente</option>
+            <option value="EM_ANDAMENTO">Em andamento</option>
+            <option value="CONCLUIDA">Concluida</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data limite</label>
+          <input type="date" name="data_limite" class="form-control" />
+        </div>
+      </div>
+      <button class="btn" style="width: 100%; margin-top: 10px" type="submit">Salvar tarefa</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

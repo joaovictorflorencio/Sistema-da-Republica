@@ -1,0 +1,106 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}RABBU{% endblock %}</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Shadows+Into+Light&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{% static 'gerenciamento_republica/css/main.css' %}" />
+    <style>
+      .hidden { display: none !important; }
+      .empty-state { color: var(--text-muted); padding: 18px 0; text-align: center; }
+      .status-chip { padding: 4px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
+      .status-pendente { background: #fff8e6; color: var(--warning); }
+      .status-em_andamento { background: #e0f2fe; color: var(--primary); }
+      .status-concluida { background: #e6fcf1; color: var(--success); }
+      .task-actions { display: flex; gap: 8px; margin-top: 12px; }
+      .task-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: .75rem; color: var(--text-muted); }
+      .list-stack { display: flex; flex-direction: column; gap: 15px; }
+      .form-row { display: flex; gap: 15px; }
+      .form-row > .form-group { flex: 1; }
+      .summary-number { font-size: 2em; font-weight: 800; letter-spacing: -1px; }
+      .helper-text { color: var(--text-muted); font-size: .85em; }
+      @media (max-width: 768px) {
+        .form-row { flex-direction: column; }
+      }
+    </style>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body data-page="{{ page_key|default:'dashboard' }}">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="{% static 'gerenciamento_republica/assets/logo.png' %}" alt="RABBU Logo" class="logo-img-sidebar" />
+      </div>
+      <div class="republic-badge">
+        <div style="font-size: 0.7em; text-transform: uppercase">Sua Republica</div>
+        <strong id="sidebar-republica-nome" style="font-size: 1.1em">RABBU</strong>
+        <div class="invite-tag"><i class="fa-solid fa-house"></i> <span id="sidebar-republica-id">Sem vinculo</span></div>
+      </div>
+      <nav class="nav-menu">
+        <a class="nav-btn {% if page_key == 'dashboard' %}active{% endif %}" href="{% url 'gerenciamento_republica:painel-page' %}">
+          <i class="fa-solid fa-chart-pie"></i> <span>Dashboard</span>
+        </a>
+        <a class="nav-btn {% if page_key == 'financas' %}active{% endif %}" href="{% url 'gerenciamento_republica:financas-page' %}">
+          <i class="fa-solid fa-wallet"></i> <span>Financas</span>
+        </a>
+        <a class="nav-btn {% if page_key == 'tarefas' %}active{% endif %}" href="{% url 'gerenciamento_republica:tarefas-page' %}">
+          <i class="fa-solid fa-broom"></i> <span>Tarefas</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="main-wrapper">
+      <header class="header">
+        <h2 class="page-title">
+          {% block page_icon %}<i class="fa-solid fa-chart-pie"></i>{% endblock %}
+          {% block page_title %}Dashboard{% endblock %}
+        </h2>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <button class="btn btn-outline btn-sm" id="logout-button">
+            <i class="fa-solid fa-right-from-bracket"></i> Sair
+          </button>
+          <div class="user-dropdown">
+            <div style="text-align: right; line-height: 1.2" class="hide-mobile">
+              <strong id="header-user-name" style="font-size: 0.9em; display: block">Usuario</strong>
+              <span id="header-user-role" style="font-size: 0.75em; color: var(--text-muted)">Morador</span>
+            </div>
+            <div class="avatar" id="header-avatar-circle">R</div>
+          </div>
+        </div>
+      </header>
+      <section id="app-content" class="content-area">
+        {% block content %}{% endblock %}
+      </section>
+    </main>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    {% block modals %}{% endblock %}
+
+    <script>
+      window.RABBU_CONFIG = {
+        urls: {
+          login: "{% url 'gerenciamento_republica:login-page' %}",
+          cadastro: "{% url 'gerenciamento_republica:cadastro-page' %}",
+          painel: "{% url 'gerenciamento_republica:painel-page' %}",
+          financas: "{% url 'gerenciamento_republica:financas-page' %}",
+          tarefas: "{% url 'gerenciamento_republica:tarefas-page' %}",
+          authLogin: "{% url 'gerenciamento_republica:login' %}",
+          authLogout: "{% url 'gerenciamento_republica:logout' %}",
+          authMe: "{% url 'gerenciamento_republica:me' %}",
+          dashboardOverview: "{% url 'gerenciamento_republica:dashboard-overview' %}"
+        }
+      };
+    </script>
+    <script src="{% static 'gerenciamento_republica/js/app.js' %}"></script>
+    {% block extra_scripts %}{% endblock %}
+  </body>
+</html>

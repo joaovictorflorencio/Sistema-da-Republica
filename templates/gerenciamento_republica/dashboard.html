@@ -1,0 +1,91 @@
+{% extends "gerenciamento_republica/base_app.html" %}
+
+{% block title %}Dashboard - RABBU{% endblock %}
+{% block page_icon %}<i class="fa-solid fa-chart-pie"></i>{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="grid-3">
+  <div class="card stat-card">
+    <div class="stat-icon"><i class="fa-solid fa-arrow-up-right-dots"></i></div>
+    <div class="stat-info">
+      <h4>Seu saldo</h4>
+      <h2 id="dashboard-user-saldo">R$ 0,00</h2>
+      <span class="badge" id="dashboard-saldo-badge" style="margin-top: 5px">Carregando</span>
+    </div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-icon" style="background: #e6fcf1; color: var(--success)">
+      <i class="fa-solid fa-file-invoice-dollar"></i>
+    </div>
+    <div class="stat-info">
+      <h4>Total da casa</h4>
+      <h2 id="dashboard-total-casa">R$ 0,00</h2>
+      <span id="dashboard-total-contas" style="font-size: 0.8em; color: var(--text-muted)">0 despesas</span>
+    </div>
+  </div>
+  <div class="card stat-card">
+    <div class="stat-icon" style="background: #fff8e6; color: var(--warning)">
+      <i class="fa-solid fa-broom"></i>
+    </div>
+    <div class="stat-info">
+      <h4>Sua proxima tarefa</h4>
+      <h2 id="dashboard-user-task" style="font-size: 1.2em; margin-top: 8px">Sem tarefa</h2>
+      <span id="dashboard-user-task-status" style="font-size: 0.8em; color: var(--text-muted)">Livre</span>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Resumo financeiro</h3>
+    </div>
+    <div id="dashboard-resumo-list" class="list-stack">
+      <div class="empty-state">Carregando resumo...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Ultimas despesas</h3>
+    </div>
+    <div id="dashboard-despesas-list" class="list-stack">
+      <div class="empty-state">Carregando despesas...</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-list-check"></i> Tarefas pendentes</h3>
+    </div>
+    <div id="dashboard-tarefas-list" class="list-stack">
+      <div class="empty-state">Carregando tarefas...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-users"></i> Informacoes da casa</h3>
+    </div>
+    <div class="list-stack">
+      <div class="expense-item">
+        <div>
+          <strong style="display:block;">Moradores ativos</strong>
+          <span class="helper-text">Total atual de moradores ativos</span>
+        </div>
+        <div class="summary-number" id="dashboard-moradores-count">0</div>
+      </div>
+      <div class="expense-item">
+        <div>
+          <strong style="display:block;">Tarefas pendentes</strong>
+          <span class="helper-text">Acompanhe a rotina da casa</span>
+        </div>
+        <div class="summary-number" id="dashboard-tarefas-count">0</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

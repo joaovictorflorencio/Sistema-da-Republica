@@ -1,0 +1,172 @@
+{% extends "gerenciamento_republica/base_app.html" %}
+
+{% block title %}Financas - RABBU{% endblock %}
+{% block page_icon %}<i class="fa-solid fa-wallet"></i>{% endblock %}
+{% block page_title %}Financas{% endblock %}
+
+{% block content %}
+<div class="grid-3">
+  <div class="card stat-card financas-hero-card">
+    <div class="stat-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+    <div class="stat-info">
+      <h4>Meu saldo</h4>
+      <h2 id="financas-meu-saldo">R$ 0,00</h2>
+      <span id="financas-meu-status" class="badge badge-success">Tudo em dia</span>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+    <div class="stat-info">
+      <h4>Total em despesas</h4>
+      <h2 id="financas-total-despesas">R$ 0,00</h2>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-icon"><i class="fa-brands fa-pix"></i></div>
+    <div class="stat-info">
+      <h4>Total em acertos</h4>
+      <h2 id="financas-total-pagamentos">R$ 0,00</h2>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap: wrap; gap: 15px">
+    <div>
+      <h3 class="card-title"><i class="fa-solid fa-wallet"></i> Visao financeira da casa</h3>
+      <p class="helper-text" style="margin-top: 8px;">Acompanhe despesas da casa e veja como os saldos ficaram divididos entre os moradores.</p>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn" data-open-modal="modal-despesa">
+        <i class="fa-solid fa-plus"></i> Nova despesa
+      </button>
+      <button class="btn btn-outline" data-open-modal="modal-pagamento">
+        <i class="fa-brands fa-pix"></i> Registrar pagamento
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-receipt"></i> Despesas da casa</h3>
+      <span class="badge badge-warning">Historico</span>
+    </div>
+    <div id="financas-despesas-list" class="expense-list">
+      <div class="empty-state">Carregando despesas...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-people-arrows"></i> Acertos registrados</h3>
+      <span class="badge badge-success">Historico</span>
+    </div>
+    <div id="financas-pagamentos-list" class="expense-list">
+      <div class="empty-state">Carregando pagamentos...</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Saldo por morador</h3>
+    <span class="helper-text">Valores positivos indicam quem tem a receber. Valores negativos indicam quem ainda deve.</span>
+  </div>
+  <div id="financas-saldos-list" class="financas-saldos-grid">
+    <div class="empty-state">Carregando saldos...</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<div class="modal-overlay" id="modal-despesa">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="margin: 0"><i class="fa-solid fa-file-invoice-dollar"></i> Lancar conta</h3>
+      <button class="btn-outline" style="border: none; font-size: 1.5em; padding: 0" data-close-modal="modal-despesa">x</button>
+    </div>
+    <form id="despesa-form">
+      <div class="form-group">
+        <label>Titulo</label>
+        <input type="text" class="form-control" name="titulo" placeholder="Ex: Luz" required />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Valor (R$)</label>
+          <input type="number" class="form-control" name="valor_total" min="0.01" step="0.01" required />
+        </div>
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" class="form-control" name="data_despesa" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select class="form-control" name="categoria" required>
+          <option value="ALUGUEL">Moradia</option>
+          <option value="ENERGIA">Energia</option>
+          <option value="AGUA">Agua</option>
+          <option value="INTERNET">Internet</option>
+          <option value="MERCADO">Mercado</option>
+          <option value="LIMPEZA">Limpeza</option>
+          <option value="OUTROS">Outros</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Descricao</label>
+        <input type="text" class="form-control" name="descricao" placeholder="Observacao opcional" />
+      </div>
+      <div class="form-group">
+        <label>Pago por</label>
+        <select class="form-control" name="paga_por" id="despesa-paga-por" required></select>
+      </div>
+      <div class="form-group">
+        <label>Dividir entre</label>
+        <select class="form-control" name="morador_ids" id="despesa-moradores" multiple size="5" required></select>
+      </div>
+      <p class="helper-text" style="margin-bottom:15px;">Use Ctrl para selecionar mais de um morador.</p>
+      <button class="btn" style="width: 100%; margin-top: 10px" type="submit">Salvar e dividir</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-pagamento">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="margin: 0"><i class="fa-brands fa-pix" style="color: var(--success)"></i> Registrar pagamento</h3>
+      <button class="btn-outline" style="border: none; font-size: 1.5em; padding: 0" data-close-modal="modal-pagamento">x</button>
+    </div>
+    <form id="pagamento-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Pagador</label>
+          <select class="form-control" name="pagador" id="pagamento-pagador" required></select>
+        </div>
+        <div class="form-group">
+          <label>Recebedor</label>
+          <select class="form-control" name="recebedor" id="pagamento-recebedor" required></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Valor</label>
+          <input type="number" class="form-control" name="valor" min="0.01" step="0.01" required />
+        </div>
+        <div class="form-group">
+          <label>Data do pagamento</label>
+          <input type="date" class="form-control" name="data_pagamento" required />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observacao</label>
+        <input type="text" class="form-control" name="observacao" placeholder="Ex: acerto internet" />
+      </div>
+      <button class="btn" style="width: 100%; margin-top: 10px" type="submit">Registrar pagamento</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
