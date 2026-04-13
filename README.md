@@ -1,6 +1,6 @@
-# Gerenciamento de Republicas
+# Sistema de Republica
 
-Este projeto e um MVP feito em Django para ajudar no dia a dia de moradias compartilhadas. A ideia e simples: reunir, em um lugar so, o que normalmente gera confusao em uma republica, como despesas da casa, organizacao de tarefas e a visao geral de como a rotina esta andando.
+Este projeto e um MVP em Django pensado para ajudar no dia a dia de moradias compartilhadas. A proposta e centralizar o que normalmente gera mais atrito em uma republica: despesas da casa, organizacao de tarefas e uma visao geral da rotina.
 
 Hoje o sistema ja permite:
 - cadastro e login pela web
@@ -9,6 +9,18 @@ Hoje o sistema ja permite:
 - lancamento de despesas
 - gerenciamento de tarefas
 - API REST para republicas, moradores, despesas, pagamentos e tarefas
+
+## Objetivo
+
+Entregar uma base funcional para organizacao de uma republica, permitindo:
+- acompanhar despesas da casa
+- dividir contas entre moradores
+- organizar tarefas domesticas
+- controlar acesso por usuario e por republica
+
+## Publico-alvo
+
+Estudantes e pessoas que moram em republicas ou em outros tipos de moradia compartilhada.
 
 ## Como rodar o projeto
 
@@ -21,7 +33,7 @@ python -m venv .venv
 .\.venv\Scripts\python manage.py runserver
 ```
 
-Depois disso, e so abrir:
+Depois disso, abra:
 
 `http://127.0.0.1:8000/`
 
@@ -154,10 +166,28 @@ Alguns pontos ficaram como proxima etapa:
 - trocar a entrada em republica por ID por algo mais amigavel, como codigo ou lista
 - dar mais polimento visual e de experiencia
 
+## Documentacao
+
+- [Documentacao Sprint 1](./documentacao_sprint1.pdf)
+
+## Equipe
+
+- Joao Victor Florencio - 01605737
+- Mateus De Miranda Santos Moura - 01592191
+- Miqueias Ferreira Barros - 01595460
+- Gabriel Marques Barbosa de Santana - 01612589
+- Erick Alves de Souza - 01613377
+- Patrick Jose Viana Costa - 01594218
+- Lucas Enthony Gomes Ferreira - 01576401
+
+## Status
+
+Em desenvolvimento. A base atual ja atende bem a proposta de MVP.
+
 ## Como rodar os testes
 
 ```powershell
 .\.venv\Scripts\python manage.py test gerenciamento_republica
 ```
 
-
+Hoje a suite cobre autenticacao, escopo por republica e a jornada principal do MVP.
