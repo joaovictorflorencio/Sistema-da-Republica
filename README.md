@@ -182,12 +182,11 @@ Alguns pontos ficaram como proxima etapa:
 
 ## Status
 
-Em desenvolvimento. A base atual ja atende bem a proposta de MVP.
-
+Em desenvolvimento.
 ## Como rodar os testes
 
 ```powershell
 .\.venv\Scripts\python manage.py test gerenciamento_republica
 ```
 
-Hoje a suite cobre autenticacao, escopo por republica e a jornada principal do MVP.
+
