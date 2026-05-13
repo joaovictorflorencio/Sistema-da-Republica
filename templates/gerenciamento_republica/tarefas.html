@@ -1,4 +1,5 @@
 {% extends "gerenciamento_republica/base_app.html" %}
+{% load static %}
 
 {% block title %}Tarefas - RABBU{% endblock %}
 {% block page_icon %}<i class="fa-solid fa-broom"></i>{% endblock %}
@@ -23,11 +24,21 @@
     <div class="kanban-header">Em andamento</div>
     <div class="kanban-body" id="tarefas-andamento-list"></div>
   </div>
-  <div class="kanban-column" data-status="CONCLUIDA" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event)">
-    <div class="kanban-header">Concluidas</div>
-    <div class="kanban-body" id="tarefas-concluida-list"></div>
+</div>
+
+<div class="card" style="margin-top: 30px;">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> Historico de tarefas concluidas</h3>
+    <span class="helper-text">Registro das tarefas que ja foram finalizadas na republica.</span>
+  </div>
+  <div id="tarefas-history-list" class="list-stack">
+    <div class="empty-state">Carregando historico...</div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'gerenciamento_republica/js/tarefas.js' %}"></script>
 {% endblock %}
 
 {% block modals %}

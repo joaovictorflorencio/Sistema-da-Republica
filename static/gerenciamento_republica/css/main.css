@@ -37,6 +37,7 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 
 /* CARDS */
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-bottom: 30px; }
+.grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 25px; margin-bottom: 30px; }
 .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 30px; }
 .card { background: #fff; padding: 30px; border-radius: var(--radius-lg); box-shadow: 0 10px 25px rgba(0,0,0,0.05); display: flex; flex-direction: column; transition: var(--transition); border: 1px solid rgba(0,0,0,0.02); }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }

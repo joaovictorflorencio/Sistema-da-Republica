@@ -1,11 +1,12 @@
 {% extends "gerenciamento_republica/base_app.html" %}
+{% load static %}
 
 {% block title %}Financas - RABBU{% endblock %}
 {% block page_icon %}<i class="fa-solid fa-wallet"></i>{% endblock %}
 {% block page_title %}Financas{% endblock %}
 
 {% block content %}
-<div class="grid-3">
+<div class="grid-4">
   <div class="card stat-card financas-hero-card">
     <div class="stat-icon"><i class="fa-solid fa-scale-balanced"></i></div>
     <div class="stat-info">
@@ -24,10 +25,18 @@
   </div>
 
   <div class="card stat-card">
-    <div class="stat-icon"><i class="fa-brands fa-pix"></i></div>
+    <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
     <div class="stat-info">
-      <h4>Total em acertos</h4>
-      <h2 id="financas-total-pagamentos">R$ 0,00</h2>
+      <h4>Total quitado</h4>
+      <h2 id="financas-total-quitado">R$ 0,00</h2>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <div class="stat-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+    <div class="stat-info">
+      <h4>Total pendente</h4>
+      <h2 id="financas-total-pendente">R$ 0,00</h2>
     </div>
   </div>
 </div>
@@ -36,7 +45,7 @@
   <div class="card-header" style="flex-wrap: wrap; gap: 15px">
     <div>
       <h3 class="card-title"><i class="fa-solid fa-wallet"></i> Visao financeira da casa</h3>
-      <p class="helper-text" style="margin-top: 8px;">Acompanhe despesas da casa e veja como os saldos ficaram divididos entre os moradores.</p>
+      <p class="helper-text" style="margin-top: 8px;">Acompanhe as despesas, quanto cada morador ainda precisa quitar e o historico de pagamentos aplicados.</p>
     </div>
     <div style="display:flex; gap:10px; flex-wrap:wrap;">
       <button class="btn" data-open-modal="modal-despesa">
@@ -62,24 +71,40 @@
 
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-people-arrows"></i> Acertos registrados</h3>
+      <h3 class="card-title"><i class="fa-solid fa-file-circle-exclamation"></i> Minhas dividas em aberto</h3>
+      <span class="badge badge-danger">Acompanhamento</span>
+    </div>
+    <div id="financas-divisoes-list" class="expense-list">
+      <div class="empty-state">Carregando dividas...</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-people-arrows"></i> Pagamentos aplicados</h3>
       <span class="badge badge-success">Historico</span>
     </div>
     <div id="financas-pagamentos-list" class="expense-list">
       <div class="empty-state">Carregando pagamentos...</div>
     </div>
   </div>
-</div>
 
-<div class="card">
-  <div class="card-header">
-    <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Saldo por morador</h3>
-    <span class="helper-text">Valores positivos indicam quem tem a receber. Valores negativos indicam quem ainda deve.</span>
-  </div>
-  <div id="financas-saldos-list" class="financas-saldos-grid">
-    <div class="empty-state">Carregando saldos...</div>
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Saldo por morador</h3>
+      <span class="helper-text">Valores positivos indicam quem tem a receber. Valores negativos indicam quem ainda deve.</span>
+    </div>
+    <div id="financas-saldos-list" class="financas-saldos-grid">
+      <div class="empty-state">Carregando saldos...</div>
+    </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'gerenciamento_republica/js/financas.js' %}"></script>
 {% endblock %}
 
 {% block modals %}
@@ -162,9 +187,16 @@
         </div>
       </div>
       <div class="form-group">
+        <label>Despesa de referencia</label>
+        <select class="form-control" name="referencia_despesa" id="pagamento-referencia-despesa">
+          <option value="">Aplicar automaticamente na divida mais antiga</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Observacao</label>
         <input type="text" class="form-control" name="observacao" placeholder="Ex: acerto internet" />
       </div>
+      <p class="helper-text" style="margin-bottom:15px;">Se voce escolher uma despesa, o pagamento sera abatido primeiro nela. Se deixar em branco, o sistema aplica no debito mais antigo entre as partes.</p>
       <button class="btn" style="width: 100%; margin-top: 10px" type="submit">Registrar pagamento</button>
     </form>
   </div>

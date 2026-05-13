@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Despesa, DivisaoDespesa, Morador, Pagamento, Republica, Tarefa
+from .models import Despesa, DivisaoDespesa, Morador, Pagamento, PagamentoDivisao, Republica, Tarefa
 
 
 @admin.register(Republica)
@@ -11,8 +11,8 @@ class RepublicaAdmin(admin.ModelAdmin):
 
 @admin.register(Morador)
 class MoradorAdmin(admin.ModelAdmin):
-    list_display = ('id', 'nome', 'email', 'usuario', 'republica', 'ativo')
-    list_filter = ('ativo', 'republica')
+    list_display = ('id', 'nome', 'email', 'usuario', 'republica', 'ativo', 'eh_admin')
+    list_filter = ('ativo', 'eh_admin', 'republica')
     search_fields = ('nome', 'email', 'usuario__username')
 
 
@@ -25,8 +25,8 @@ class DespesaAdmin(admin.ModelAdmin):
 
 @admin.register(DivisaoDespesa)
 class DivisaoDespesaAdmin(admin.ModelAdmin):
-    list_display = ('id', 'despesa', 'morador', 'valor_devido', 'quitado')
-    list_filter = ('quitado', 'despesa__republica')
+    list_display = ('id', 'despesa', 'morador', 'valor_devido', 'valor_pago', 'status')
+    list_filter = ('status', 'despesa__republica')
     search_fields = ('despesa__titulo', 'morador__nome')
 
 
@@ -35,6 +35,13 @@ class PagamentoAdmin(admin.ModelAdmin):
     list_display = ('id', 'republica', 'pagador', 'recebedor', 'valor', 'data_pagamento')
     list_filter = ('republica', 'data_pagamento')
     search_fields = ('pagador__nome', 'recebedor__nome', 'observacao')
+
+
+@admin.register(PagamentoDivisao)
+class PagamentoDivisaoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'pagamento', 'divisao', 'valor_aplicado')
+    list_filter = ('pagamento__republica',)
+    search_fields = ('divisao__despesa__titulo', 'divisao__morador__nome')
 
 
 @admin.register(Tarefa)

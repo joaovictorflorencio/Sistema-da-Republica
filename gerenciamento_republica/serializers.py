@@ -6,7 +6,15 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 
-from .models import Despesa, DivisaoDespesa, Morador, Pagamento, Republica, Tarefa
+from .models import (
+    Despesa,
+    DivisaoDespesa,
+    Morador,
+    Pagamento,
+    PagamentoDivisao,
+    Republica,
+    Tarefa,
+)
 
 User = get_user_model()
 
@@ -21,7 +29,10 @@ def _build_instance(serializer, model_class, attrs):
             continue
         data[field.name] = getattr(serializer.instance, field.name)
     data.update(attrs)
-    return model_class(**data)
+    instance = model_class(**data)
+    instance.pk = serializer.instance.pk
+    instance._state.adding = False
+    return instance
 
 
 class RepublicaSerializer(serializers.ModelSerializer):
@@ -34,6 +45,7 @@ class RepublicaSerializer(serializers.ModelSerializer):
 class UsuarioSerializer(serializers.ModelSerializer):
     morador_id = serializers.IntegerField(source='morador.id', read_only=True)
     morador_nome = serializers.CharField(source='morador.nome', read_only=True)
+    morador_eh_admin = serializers.BooleanField(source='morador.eh_admin', read_only=True)
     republica_id = serializers.IntegerField(source='morador.republica.id', read_only=True)
     republica_nome = serializers.CharField(source='morador.republica.nome', read_only=True)
 
@@ -47,6 +59,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'last_name',
             'morador_id',
             'morador_nome',
+            'morador_eh_admin',
             'republica_id',
             'republica_nome',
         ]
@@ -136,6 +149,7 @@ class CadastroUsuarioSerializer(serializers.Serializer):
                 email=user.email,
                 usuario=user,
                 republica=republica,
+                eh_admin=bool(nova_republica_nome),
             )
 
         token, _ = Token.objects.get_or_create(user=user)
@@ -181,11 +195,20 @@ class MoradorSerializer(serializers.ModelSerializer):
             'usuario_username',
             'republica',
             'ativo',
+            'eh_admin',
             'data_entrada',
         ]
-        read_only_fields = ['id']
+        read_only_fields = ['id', 'usuario', 'usuario_username']
 
     def validate(self, attrs):
+        if (
+            self.instance
+            and 'republica' in attrs
+            and attrs['republica'].id != self.instance.republica_id
+        ):
+            raise serializers.ValidationError(
+                {'republica': 'Nao e permitido mover um morador para outra republica por edicao.'}
+            )
         instance = _build_instance(self, Morador, attrs)
         instance.full_clean()
         return attrs
@@ -193,10 +216,28 @@ class MoradorSerializer(serializers.ModelSerializer):
 
 class DivisaoDespesaSerializer(serializers.ModelSerializer):
     morador_nome = serializers.CharField(source='morador.nome', read_only=True)
+    despesa_titulo = serializers.CharField(source='despesa.titulo', read_only=True)
+    despesa_categoria = serializers.CharField(source='despesa.categoria', read_only=True)
+    despesa_data = serializers.DateField(source='despesa.data_despesa', read_only=True)
+    credor_nome = serializers.CharField(source='despesa.paga_por.nome', read_only=True)
+    saldo_aberto = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = DivisaoDespesa
-        fields = ['id', 'despesa', 'morador', 'morador_nome', 'valor_devido', 'quitado']
+        fields = [
+            'id',
+            'despesa',
+            'despesa_titulo',
+            'despesa_categoria',
+            'despesa_data',
+            'morador',
+            'morador_nome',
+            'credor_nome',
+            'valor_devido',
+            'valor_pago',
+            'saldo_aberto',
+            'status',
+        ]
         read_only_fields = ['id']
 
     def validate(self, attrs):
@@ -208,6 +249,9 @@ class DivisaoDespesaSerializer(serializers.ModelSerializer):
 class DespesaSerializer(serializers.ModelSerializer):
     divisoes = DivisaoDespesaSerializer(many=True, read_only=True)
     paga_por_nome = serializers.CharField(source='paga_por.nome', read_only=True)
+    participantes_count = serializers.SerializerMethodField()
+    valor_em_aberto = serializers.SerializerMethodField()
+    valor_quitado = serializers.SerializerMethodField()
     morador_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         write_only=True,
@@ -229,38 +273,65 @@ class DespesaSerializer(serializers.ModelSerializer):
             'paga_por_nome',
             'data_despesa',
             'criada_em',
+            'participantes_count',
+            'valor_em_aberto',
+            'valor_quitado',
             'morador_ids',
             'divisoes',
         ]
         read_only_fields = ['id', 'criada_em', 'divisoes']
+
+    def get_participantes_count(self, obj):
+        return obj.divisoes.count()
+
+    def get_valor_em_aberto(self, obj):
+        total = sum(
+            divisao.saldo_aberto
+            for divisao in obj.divisoes.all()
+            if divisao.morador_id != obj.paga_por_id
+        )
+        return total
+
+    def get_valor_quitado(self, obj):
+        return obj.valor_total - self.get_valor_em_aberto(obj)
 
     def validate(self, attrs):
         morador_ids = attrs.pop('morador_ids', None)
         instance = _build_instance(self, Despesa, attrs)
         instance.full_clean()
 
+        participantes = None
         republica = instance.republica
-        if morador_ids is None:
-            participantes = list(republica.moradores.filter(ativo=True).order_by('id'))
-        else:
-            participantes = list(Morador.objects.filter(id__in=morador_ids).order_by('id'))
+        if morador_ids is not None:
+            participantes = list(Morador.objects.filter(id__in=morador_ids, ativo=True).order_by('id'))
             if len(participantes) != len(set(morador_ids)):
                 raise serializers.ValidationError(
-                    {'morador_ids': 'Um ou mais moradores informados nao existem.'}
+                    {'morador_ids': 'Um ou mais moradores informados nao existem ou estao inativos.'}
                 )
+        elif self.instance is None:
+            participantes = list(republica.moradores.filter(ativo=True).order_by('id'))
 
-        if not participantes:
+        if participantes is not None and not participantes:
             raise serializers.ValidationError(
                 {'morador_ids': 'Informe pelo menos um morador para dividir a despesa.'}
             )
 
-        ids_invalidos = [morador.id for morador in participantes if morador.republica_id != republica.id]
-        if ids_invalidos:
-            raise serializers.ValidationError(
-                {'morador_ids': 'Todos os moradores da divisao precisam ser da mesma republica.'}
-            )
+        if participantes is not None:
+            ids_invalidos = [morador.id for morador in participantes if morador.republica_id != republica.id]
+            if ids_invalidos:
+                raise serializers.ValidationError(
+                    {'morador_ids': 'Todos os moradores da divisao precisam ser da mesma republica.'}
+                )
 
-        attrs['morador_ids'] = [morador.id for morador in participantes]
+        if self.instance and PagamentoDivisao.objects.filter(divisao__despesa=self.instance).exists():
+            campos_sensiveis = {'valor_total', 'paga_por', 'republica'}
+            if morador_ids is not None or (set(attrs.keys()) & campos_sensiveis):
+                raise serializers.ValidationError(
+                    {'detail': 'Nao e possivel alterar a estrutura financeira de uma despesa que ja possui pagamentos aplicados.'}
+                )
+
+        if participantes is not None:
+            attrs['morador_ids'] = [morador.id for morador in participantes]
         return attrs
 
     @transaction.atomic
@@ -294,20 +365,48 @@ class DespesaSerializer(serializers.ModelSerializer):
         divisoes = []
         for indice, morador in enumerate(participantes):
             acrescimo = Decimal('0.01') if Decimal(indice) < (restante * 100) else Decimal('0.00')
+            valor_devido = base + acrescimo
+            valor_pago = valor_devido if morador.id == despesa.paga_por_id else Decimal('0.00')
             divisoes.append(
                 DivisaoDespesa(
                     despesa=despesa,
                     morador=morador,
-                    valor_devido=base + acrescimo,
+                    valor_devido=valor_devido,
+                    valor_pago=valor_pago,
+                    status=(
+                        DivisaoDespesa.Status.QUITADO
+                        if valor_pago == valor_devido
+                        else DivisaoDespesa.Status.PENDENTE
+                    ),
                 )
             )
 
         DivisaoDespesa.objects.bulk_create(divisoes)
 
 
+class PagamentoDivisaoSerializer(serializers.ModelSerializer):
+    despesa_id = serializers.IntegerField(source='divisao.despesa.id', read_only=True)
+    despesa_titulo = serializers.CharField(source='divisao.despesa.titulo', read_only=True)
+    morador_nome = serializers.CharField(source='divisao.morador.nome', read_only=True)
+
+    class Meta:
+        model = PagamentoDivisao
+        fields = [
+            'id',
+            'divisao',
+            'despesa_id',
+            'despesa_titulo',
+            'morador_nome',
+            'valor_aplicado',
+        ]
+        read_only_fields = fields
+
+
 class PagamentoSerializer(serializers.ModelSerializer):
     pagador_nome = serializers.CharField(source='pagador.nome', read_only=True)
     recebedor_nome = serializers.CharField(source='recebedor.nome', read_only=True)
+    referencia_despesa_titulo = serializers.CharField(source='referencia_despesa.titulo', read_only=True)
+    itens = PagamentoDivisaoSerializer(many=True, read_only=True)
 
     class Meta:
         model = Pagamento
@@ -320,16 +419,130 @@ class PagamentoSerializer(serializers.ModelSerializer):
             'recebedor_nome',
             'valor',
             'referencia_despesa',
+            'referencia_despesa_titulo',
             'observacao',
             'data_pagamento',
             'criado_em',
+            'itens',
         ]
-        read_only_fields = ['id', 'criado_em']
+        read_only_fields = ['id', 'criado_em', 'referencia_despesa_titulo', 'itens']
+
+    def _mapear_aplicacoes_atuais(self):
+        if not self.instance:
+            return {}
+        return {
+            item.divisao_id: item.valor_aplicado
+            for item in self.instance.itens.select_related('divisao')
+        }
+
+    def _obter_divisoes_alvo(self, instance):
+        query = (
+            DivisaoDespesa.objects.select_related('despesa', 'morador', 'despesa__paga_por')
+            .filter(
+                despesa__republica=instance.republica,
+                morador=instance.pagador,
+                despesa__paga_por=instance.recebedor,
+            )
+            .order_by('despesa__data_despesa', 'despesa_id', 'id')
+        )
+        if instance.referencia_despesa_id:
+            query = query.filter(despesa=instance.referencia_despesa)
+        return list(query)
+
+    def _construir_aplicacoes(self, instance):
+        aplicacoes_atuais = self._mapear_aplicacoes_atuais()
+        divisoes = self._obter_divisoes_alvo(instance)
+        if not divisoes:
+            raise serializers.ValidationError(
+                {'detail': 'Nao existem divisoes em aberto entre esse pagador e recebedor.'}
+            )
+
+        restante = instance.valor
+        aplicacoes = []
+        total_disponivel = Decimal('0.00')
+
+        for divisao in divisoes:
+            disponivel = divisao.saldo_aberto + aplicacoes_atuais.get(divisao.id, Decimal('0.00'))
+            if disponivel <= Decimal('0.00'):
+                continue
+            total_disponivel += disponivel
+            valor_aplicado = min(restante, disponivel)
+            if valor_aplicado > Decimal('0.00'):
+                aplicacoes.append(
+                    {
+                        'divisao': divisao,
+                        'valor_aplicado': valor_aplicado,
+                    }
+                )
+                restante -= valor_aplicado
+            if restante <= Decimal('0.00'):
+                break
+
+        if not aplicacoes:
+            raise serializers.ValidationError(
+                {'detail': 'Nao ha saldo pendente para aplicar nesse pagamento.'}
+            )
+
+        if restante > Decimal('0.00'):
+            raise serializers.ValidationError(
+                {
+                    'valor': (
+                        f'O valor do pagamento nao pode ser maior que R$ {total_disponivel:.2f} '
+                        'para esse acerto.'
+                    )
+                }
+            )
+
+        return aplicacoes
+
+    def _aplicar_pagamento(self, pagamento, aplicacoes):
+        itens = []
+        for aplicacao in aplicacoes:
+            divisao = aplicacao['divisao']
+            valor_aplicado = aplicacao['valor_aplicado']
+            divisao.valor_pago += valor_aplicado
+            divisao.save(update_fields=['valor_pago', 'status'])
+            itens.append(
+                PagamentoDivisao(
+                    pagamento=pagamento,
+                    divisao=divisao,
+                    valor_aplicado=valor_aplicado,
+                )
+            )
+        PagamentoDivisao.objects.bulk_create(itens)
+
+    def _desfazer_pagamento(self, pagamento):
+        for item in pagamento.itens.select_related('divisao'):
+            divisao = item.divisao
+            divisao.valor_pago -= item.valor_aplicado
+            if divisao.valor_pago < Decimal('0.00'):
+                divisao.valor_pago = Decimal('0.00')
+            divisao.save(update_fields=['valor_pago', 'status'])
+        pagamento.itens.all().delete()
 
     def validate(self, attrs):
         instance = _build_instance(self, Pagamento, attrs)
         instance.full_clean()
+        attrs['_aplicacoes'] = self._construir_aplicacoes(instance)
         return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        aplicacoes = validated_data.pop('_aplicacoes')
+        pagamento = Pagamento.objects.create(**validated_data)
+        self._aplicar_pagamento(pagamento, aplicacoes)
+        return pagamento
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        aplicacoes = validated_data.pop('_aplicacoes')
+        self._desfazer_pagamento(instance)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.full_clean()
+        instance.save()
+        self._aplicar_pagamento(instance, aplicacoes)
+        return instance
 
 
 class TarefaSerializer(serializers.ModelSerializer):
@@ -353,6 +566,14 @@ class TarefaSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'criada_em']
 
     def validate(self, attrs):
+        if (
+            self.instance
+            and 'republica' in attrs
+            and attrs['republica'].id != self.instance.republica_id
+        ):
+            raise serializers.ValidationError(
+                {'republica': 'Nao e permitido mover uma tarefa para outra republica por edicao.'}
+            )
         instance = _build_instance(self, Tarefa, attrs)
         instance.full_clean()
         return attrs
@@ -376,8 +597,11 @@ class ResumoMoradorSerializer(serializers.Serializer):
     nome = serializers.CharField()
     total_pago_em_despesas = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_devido = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_quitado = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_pendente = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_pago_em_acertos = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_recebido_em_acertos = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_credito_aberto = serializers.DecimalField(max_digits=10, decimal_places=2)
     saldo = serializers.DecimalField(max_digits=10, decimal_places=2)
 
 
@@ -385,6 +609,8 @@ class RepublicaResumoSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     nome = serializers.CharField()
     total_despesas = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_quitado = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_pendente = serializers.DecimalField(max_digits=10, decimal_places=2)
     moradores = ResumoMoradorSerializer(many=True)
 
 

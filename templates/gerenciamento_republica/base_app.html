@@ -27,6 +27,7 @@
       .form-row { display: flex; gap: 15px; }
       .form-row > .form-group { flex: 1; }
       .summary-number { font-size: 2em; font-weight: 800; letter-spacing: -1px; }
+      .summary-text { font-size: 1.05em; font-weight: 700; text-align: right; max-width: 180px; }
       .helper-text { color: var(--text-muted); font-size: .85em; }
       @media (max-width: 768px) {
         .form-row { flex-direction: column; }
@@ -100,7 +101,7 @@
         }
       };
     </script>
-    <script src="{% static 'gerenciamento_republica/js/app.js' %}"></script>
+    <script src="{% static 'gerenciamento_republica/js/core.js' %}"></script>
     {% block extra_scripts %}{% endblock %}
   </body>
 </html>

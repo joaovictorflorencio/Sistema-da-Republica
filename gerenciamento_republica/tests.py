@@ -5,7 +5,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Despesa, DivisaoDespesa, Morador, Pagamento, Republica, Tarefa
+from .models import Despesa, DivisaoDespesa, Morador, Pagamento, PagamentoDivisao, Republica, Tarefa
 
 User = get_user_model()
 
@@ -64,9 +64,12 @@ class DespesaApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         despesa = Despesa.objects.get(pk=response.data['id'])
         divisoes = DivisaoDespesa.objects.filter(despesa=despesa).order_by('morador_id')
+        divisao_pagante = divisoes.get(morador=self.m1)
 
         self.assertEqual(divisoes.count(), 3)
         self.assertEqual(sum(divisao.valor_devido for divisao in divisoes), Decimal('100.00'))
+        self.assertEqual(divisao_pagante.valor_pago, divisao_pagante.valor_devido)
+        self.assertEqual(divisao_pagante.status, DivisaoDespesa.Status.QUITADO)
 
     def test_resumo_financeiro_retorna_saldo(self):
         despesa = Despesa.objects.create(
@@ -86,6 +89,8 @@ class DespesaApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['total_despesas'], '90.00')
+        self.assertEqual(response.data['total_quitado'], '30.00')
+        self.assertEqual(response.data['total_pendente'], '60.00')
         saldos = {item['nome']: item['saldo'] for item in response.data['moradores']}
         self.assertEqual(saldos['Ana'], '60.00')
         self.assertEqual(saldos['Bia'], '-30.00')
@@ -121,6 +126,50 @@ class DespesaApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['pagador_nome'], 'Bia')
         self.assertEqual(response.data['recebedor_nome'], 'Ana')
+        self.assertEqual(len(response.data['itens']), 1)
+        divisao_bia = DivisaoDespesa.objects.get(despesa=despesa, morador=self.m2)
+        self.assertEqual(divisao_bia.valor_pago, Decimal('33.33'))
+        self.assertEqual(divisao_bia.status, DivisaoDespesa.Status.QUITADO)
+
+    def test_pagamento_parcial_atualiza_divisao_e_cria_item_de_aplicacao(self):
+        response = self.client.post(
+            '/api/despesas/',
+            {
+                'republica': self.republica.id,
+                'titulo': 'Mercado do mes',
+                'descricao': 'Compras compartilhadas',
+                'categoria': 'MERCADO',
+                'valor_total': '90.00',
+                'paga_por': self.m1.id,
+                'data_despesa': '2026-04-10',
+                'morador_ids': [self.m1.id, self.m2.id, self.m3.id],
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        despesa_id = response.data['id']
+
+        pagamento = self.client.post(
+            '/api/pagamentos/',
+            {
+                'republica': self.republica.id,
+                'pagador': self.m2.id,
+                'recebedor': self.m1.id,
+                'valor': '15.00',
+                'referencia_despesa': despesa_id,
+                'observacao': 'Primeira parcela',
+                'data_pagamento': '2026-04-11',
+            },
+            format='json',
+        )
+
+        self.assertEqual(pagamento.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(PagamentoDivisao.objects.count(), 1)
+        divisao_bia = DivisaoDespesa.objects.get(despesa_id=despesa_id, morador=self.m2)
+        self.assertEqual(divisao_bia.valor_devido, Decimal('30.00'))
+        self.assertEqual(divisao_bia.valor_pago, Decimal('15.00'))
+        self.assertEqual(divisao_bia.saldo_aberto, Decimal('15.00'))
+        self.assertEqual(divisao_bia.status, DivisaoDespesa.Status.PARCIAL)
 
     def test_nao_permite_pagamento_acima_do_saldo_devido(self):
         despesa = Despesa.objects.create(
@@ -239,6 +288,7 @@ class AutenticacaoApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         morador = Morador.objects.get(usuario__username='nova_moradora')
         self.assertEqual(morador.republica.nome, 'Casa Aurora')
+        self.assertTrue(morador.eh_admin)
 
 
 class EscopoRepublicaTests(APITestCase):
@@ -279,14 +329,14 @@ class EscopoRepublicaTests(APITestCase):
             paga_por=self.morador_2,
             data_despesa='2026-04-04',
         )
-        Tarefa.objects.create(
+        self.tarefa_1 = Tarefa.objects.create(
             republica=self.republica_1,
             titulo='Limpar cozinha',
             responsavel=self.morador_1,
             status='PENDENTE',
             prioridade='MEDIA',
         )
-        Tarefa.objects.create(
+        self.tarefa_2 = Tarefa.objects.create(
             republica=self.republica_2,
             titulo='Comprar gas',
             responsavel=self.morador_2,
@@ -316,6 +366,186 @@ class EscopoRepublicaTests(APITestCase):
         self.assertEqual(len(response.data['ultimas_despesas']), 1)
         self.assertEqual(len(response.data['tarefas_pendentes']), 1)
 
+    def test_dashboard_considera_apenas_moradores_ativos(self):
+        Morador.objects.create(
+            nome='Morador Inativo',
+            email='inativo@example.com',
+            republica=self.republica_1,
+            ativo=False,
+        )
+
+        response = self.client.get('/api/dashboard/overview/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['total_moradores'], 1)
+
+    def test_usuario_comum_nao_pode_editar_morador(self):
+        response = self.client.patch(
+            f'/api/moradores/{self.morador_1.id}/',
+            {'nome': 'Nome alterado'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_da_republica_pode_editar_morador(self):
+        self.morador_1.eh_admin = True
+        self.morador_1.save(update_fields=['eh_admin'])
+
+        response = self.client.patch(
+            f'/api/moradores/{self.morador_1.id}/',
+            {'nome': 'Nome admin alterado'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.morador_1.refresh_from_db()
+        self.assertEqual(self.morador_1.nome, 'Nome admin alterado')
+
+    def test_admin_da_republica_nao_pode_mover_morador_para_outra_republica(self):
+        self.morador_1.eh_admin = True
+        self.morador_1.save(update_fields=['eh_admin'])
+
+        response = self.client.patch(
+            f'/api/moradores/{self.morador_1.id}/',
+            {'republica': self.republica_2.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.morador_1.refresh_from_db()
+        self.assertEqual(self.morador_1.republica_id, self.republica_1.id)
+
+    def test_usuario_comum_nao_pode_excluir_despesa(self):
+        response = self.client.delete(f'/api/despesas/{self.despesa_1.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_da_republica_pode_editar_despesa_existente(self):
+        self.morador_1.eh_admin = True
+        self.morador_1.save(update_fields=['eh_admin'])
+
+        response = self.client.patch(
+            f'/api/despesas/{self.despesa_1.id}/',
+            {'titulo': 'Internet atualizada'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.despesa_1.refresh_from_db()
+        self.assertEqual(self.despesa_1.titulo, 'Internet atualizada')
+
+    def test_editar_titulo_da_despesa_nao_recria_divisoes(self):
+        self.morador_1.eh_admin = True
+        self.morador_1.save(update_fields=['eh_admin'])
+        DivisaoDespesa.objects.create(
+            despesa=self.despesa_1,
+            morador=self.morador_1,
+            valor_devido=Decimal('40.00'),
+            valor_pago=Decimal('40.00'),
+        )
+        DivisaoDespesa.objects.create(
+            despesa=self.despesa_1,
+            morador=self.morador_2,
+            valor_devido=Decimal('40.00'),
+            valor_pago=Decimal('0.00'),
+        )
+
+        ids_antes = list(self.despesa_1.divisoes.values_list('id', flat=True).order_by('id'))
+        response = self.client.patch(
+            f'/api/despesas/{self.despesa_1.id}/',
+            {'titulo': 'Internet casa 1 ajustada'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids_depois = list(self.despesa_1.divisoes.values_list('id', flat=True).order_by('id'))
+        self.assertEqual(ids_antes, ids_depois)
+
+    def test_usuario_comum_nao_pode_editar_despesa_existente(self):
+        response = self.client.patch(
+            f'/api/despesas/{self.despesa_1.id}/',
+            {'titulo': 'Titulo alterado'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_usuario_comum_so_pode_alterar_status_da_tarefa(self):
+        response = self.client.patch(
+            f'/api/tarefas/{self.tarefa_1.id}/',
+            {'status': 'CONCLUIDA'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], 'CONCLUIDA')
+
+    def test_usuario_comum_nao_pode_editar_outros_campos_da_tarefa(self):
+        response = self.client.patch(
+            f'/api/tarefas/{self.tarefa_1.id}/',
+            {'titulo': 'Novo titulo'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_da_republica_nao_pode_mover_tarefa_para_outra_republica(self):
+        self.morador_1.eh_admin = True
+        self.morador_1.save(update_fields=['eh_admin'])
+
+        response = self.client.patch(
+            f'/api/tarefas/{self.tarefa_1.id}/',
+            {'republica': self.republica_2.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.tarefa_1.refresh_from_db()
+        self.assertEqual(self.tarefa_1.republica_id, self.republica_1.id)
+
+    def test_campo_usuario_de_morador_nao_e_editavel_pela_api(self):
+        outro_user = User.objects.create_user(
+            username='outro_login',
+            email='outrologin@example.com',
+            password='SenhaForte123',
+        )
+
+        response = self.client.post(
+            '/api/moradores/',
+            {
+                'nome': 'Novo Morador',
+                'email': 'novo@example.com',
+                'usuario': outro_user.id,
+                'republica': self.republica_1.id,
+                'ativo': True,
+                'data_entrada': '2026-04-13',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        morador = Morador.objects.get(id=response.data['id'])
+        self.assertIsNone(morador.usuario)
+
+    def test_usuario_comum_nao_pode_criar_morador_como_admin(self):
+        response = self.client.post(
+            '/api/moradores/',
+            {
+                'nome': 'Novo Admin Indevido',
+                'email': 'novo-admin@example.com',
+                'republica': self.republica_1.id,
+                'ativo': True,
+                'eh_admin': True,
+                'data_entrada': '2026-04-13',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        morador = Morador.objects.get(id=response.data['id'])
+        self.assertFalse(morador.eh_admin)
+
 
 class RepublicaFlowTests(APITestCase):
     def setUp(self):
@@ -341,6 +571,7 @@ class RepublicaFlowTests(APITestCase):
         morador = Morador.objects.get(usuario=self.user)
         self.assertEqual(morador.republica_id, response.data['id'])
         self.assertEqual(morador.nome, 'Criador')
+        self.assertTrue(morador.eh_admin)
 
     def test_nao_permite_criar_outra_republica_quando_usuario_ja_tem_vinculo(self):
         republica = Republica.objects.create(nome='Casa Atual', endereco='Rua A')

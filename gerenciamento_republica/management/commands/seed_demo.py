@@ -38,6 +38,7 @@ class Command(BaseCommand):
         morador1.usuario = user1
         morador1.republica = republica
         morador1.nome = 'Usuario Teste'
+        morador1.eh_admin = True
         morador1.save()
 
         morador2, _ = Morador.objects.get_or_create(
@@ -47,6 +48,7 @@ class Command(BaseCommand):
         morador2.usuario = user2
         morador2.republica = republica
         morador2.nome = 'Mateus De Miranda Santos Moura'
+        morador2.eh_admin = False
         morador2.save()
 
         morador3, _ = Morador.objects.get_or_create(

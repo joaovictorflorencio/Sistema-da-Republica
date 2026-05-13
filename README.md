@@ -166,10 +166,6 @@ Alguns pontos ficaram como proxima etapa:
 - trocar a entrada em republica por ID por algo mais amigavel, como codigo ou lista
 - dar mais polimento visual e de experiencia
 
-## Documentacao
-
-- [Documentacao Sprint 1](./documentacao_sprint1.pdf)
-
 ## Equipe
 
 - Joao Victor Florencio - 01605737

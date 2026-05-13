@@ -1,4 +1,5 @@
 {% extends "gerenciamento_republica/base_app.html" %}
+{% load static %}
 
 {% block title %}Dashboard - RABBU{% endblock %}
 {% block page_icon %}<i class="fa-solid fa-chart-pie"></i>{% endblock %}
@@ -73,6 +74,13 @@
     <div class="list-stack">
       <div class="expense-item">
         <div>
+          <strong style="display:block;">Administrador da republica</strong>
+          <span class="helper-text">Responsavel pelas alteracoes principais da casa</span>
+        </div>
+        <div class="summary-text" id="dashboard-admin-name">Carregando</div>
+      </div>
+      <div class="expense-item">
+        <div>
           <strong style="display:block;">Moradores ativos</strong>
           <span class="helper-text">Total atual de moradores ativos</span>
         </div>
@@ -88,4 +96,8 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'gerenciamento_republica/js/dashboard.js' %}"></script>
 {% endblock %}
