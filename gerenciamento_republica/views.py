@@ -12,6 +12,7 @@ from django.shortcuts import render
 from rest_framework import permissions, status, viewsets
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -283,6 +284,7 @@ class MoradorViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
 class DespesaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = DespesaSerializer
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def get_queryset(self):
         queryset = (
@@ -298,14 +300,34 @@ class DespesaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
             return
         serializer.save(republica=self.get_required_user_republica())
 
+    def _usuario_pode_quitar_despesa(self, despesa, campos_alterados):
+        morador = self.get_user_morador()
+        if not morador or morador.republica_id != despesa.republica_id:
+            return False
+
+        campos_permitidos = {
+            'status_pagamento',
+            'data_pagamento',
+            'comprovante_pagamento',
+            'quitada_por',
+        }
+        return not (campos_alterados - campos_permitidos)
+
     def perform_update(self, serializer):
         despesa = self.get_object()
         self.validate_user_republica(despesa.republica)
-        self.ensure_republic_admin(
-            despesa.republica,
-            'Somente o administrador da republica pode editar despesas existentes.',
-        )
-        serializer.save()
+        campos_alterados = set(serializer.validated_data.keys())
+
+        if self.user_is_republic_admin(despesa.republica):
+            serializer.save()
+            return
+
+        if not self._usuario_pode_quitar_despesa(despesa, campos_alterados):
+            raise PermissionDenied(
+                'Somente o administrador da republica pode editar despesas. Moradores comuns podem apenas concluir o pagamento e anexar o comprovante.'
+            )
+
+        serializer.save(republica=despesa.republica, quitada_por=self.get_user_morador())
 
     def perform_destroy(self, instance):
         self.validate_user_republica(instance.republica)

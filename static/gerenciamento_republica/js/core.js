@@ -57,13 +57,19 @@
   }
 
   async function apiFetch(url, options = {}) {
+    const headers = {
+      Authorization: `Token ${getToken()}`,
+      ...(options.headers || {}),
+    };
+    const isFormData = options.body instanceof FormData;
+
+    if (!isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
+
     const response = await fetch(url, {
       ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Token ${getToken()}`,
-        ...(options.headers || {}),
-      },
+      headers,
     });
     if (response.status === 401) {
       localStorage.removeItem(tokenKey);

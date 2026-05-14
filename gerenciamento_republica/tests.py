@@ -1,15 +1,21 @@
+import shutil
 from decimal import Decimal
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from .models import Despesa, DivisaoDespesa, Morador, Pagamento, PagamentoDivisao, Republica, Tarefa
 
 User = get_user_model()
+TEST_MEDIA_ROOT = Path(__file__).resolve().parent.parent / 'test_media'
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class DespesaApiTests(APITestCase):
     def setUp(self):
         self.republica = Republica.objects.create(nome='Solar 101', endereco='Rua A, 10')
@@ -45,6 +51,11 @@ class DespesaApiTests(APITestCase):
         self.token = login_response.data['token']
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.token}')
 
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
     def test_cria_despesa_com_divisao_automatica(self):
         response = self.client.post(
             '/api/despesas/',
@@ -70,6 +81,7 @@ class DespesaApiTests(APITestCase):
         self.assertEqual(sum(divisao.valor_devido for divisao in divisoes), Decimal('100.00'))
         self.assertEqual(divisao_pagante.valor_pago, divisao_pagante.valor_devido)
         self.assertEqual(divisao_pagante.status, DivisaoDespesa.Status.QUITADO)
+        self.assertEqual(despesa.status_pagamento, Despesa.StatusPagamento.PENDENTE)
 
     def test_resumo_financeiro_retorna_saldo(self):
         despesa = Despesa.objects.create(
@@ -200,6 +212,114 @@ class DespesaApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('valor', response.data)
+
+    def test_qualquer_morador_da_republica_pode_marcar_despesa_como_paga_com_comprovante(self):
+        despesa = Despesa.objects.create(
+            republica=self.republica,
+            titulo='Conta de agua',
+            descricao='Conta mensal',
+            categoria='AGUA',
+            valor_total='78.50',
+            paga_por=self.m1,
+            data_vencimento='2026-04-14',
+            data_despesa='2026-04-10',
+        )
+        DivisaoDespesa.objects.create(
+            despesa=despesa,
+            morador=self.m1,
+            valor_devido=Decimal('26.17'),
+            valor_pago=Decimal('26.17'),
+        )
+        DivisaoDespesa.objects.create(despesa=despesa, morador=self.m2, valor_devido=Decimal('26.17'))
+        DivisaoDespesa.objects.create(despesa=despesa, morador=self.m3, valor_devido=Decimal('26.16'))
+
+        comprovante = SimpleUploadedFile(
+            'comprovante.pdf',
+            b'conteudo do comprovante',
+            content_type='application/pdf',
+        )
+        response = self.client.patch(
+            f'/api/despesas/{despesa.id}/',
+            {
+                'status_pagamento': Despesa.StatusPagamento.PAGA,
+                'data_pagamento': '2026-04-14',
+                'comprovante_pagamento': comprovante,
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        despesa.refresh_from_db()
+        self.assertEqual(despesa.status_pagamento, Despesa.StatusPagamento.PAGA)
+        self.assertEqual(str(despesa.data_pagamento), '2026-04-14')
+        self.assertTrue(bool(despesa.comprovante_pagamento))
+        self.assertEqual(despesa.quitada_por_id, self.m1.id)
+
+        outro_user = User.objects.create_user(
+            username='carlos_login',
+            email='carlos@example.com',
+            password='SenhaForte123',
+        )
+        outro_morador = Morador.objects.create(
+            nome='Carlos',
+            email='carlos-morador@example.com',
+            usuario=outro_user,
+            republica=self.republica,
+        )
+        despesa_pendente = Despesa.objects.create(
+            republica=self.republica,
+            titulo='Conta de gas',
+            descricao='Reposicao',
+            categoria='OUTROS',
+            valor_total='95.00',
+            paga_por=self.m2,
+            data_vencimento='2026-04-20',
+            data_despesa='2026-04-13',
+        )
+
+        self.client.force_authenticate(user=outro_user)
+        comprovante_outro = SimpleUploadedFile(
+            'comprovante-outro.pdf',
+            b'conteudo do comprovante de outro morador',
+            content_type='application/pdf',
+        )
+        response_outro = self.client.patch(
+            f'/api/despesas/{despesa_pendente.id}/',
+            {
+                'status_pagamento': Despesa.StatusPagamento.PAGA,
+                'data_pagamento': '2026-04-20',
+                'comprovante_pagamento': comprovante_outro,
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response_outro.status_code, status.HTTP_200_OK)
+        despesa_pendente.refresh_from_db()
+        self.assertEqual(despesa_pendente.quitada_por_id, outro_morador.id)
+
+    def test_nao_permite_marcar_despesa_como_paga_sem_comprovante(self):
+        despesa = Despesa.objects.create(
+            republica=self.republica,
+            titulo='Conta de luz',
+            descricao='Conta mensal',
+            categoria='ENERGIA',
+            valor_total='110.00',
+            paga_por=self.m1,
+            data_vencimento='2026-04-18',
+            data_despesa='2026-04-12',
+        )
+
+        response = self.client.patch(
+            f'/api/despesas/{despesa.id}/',
+            {
+                'status_pagamento': Despesa.StatusPagamento.PAGA,
+                'data_pagamento': '2026-04-18',
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('comprovante_pagamento', response.data)
 
 
 class AutenticacaoApiTests(APITestCase):

@@ -249,9 +249,11 @@ class DivisaoDespesaSerializer(serializers.ModelSerializer):
 class DespesaSerializer(serializers.ModelSerializer):
     divisoes = DivisaoDespesaSerializer(many=True, read_only=True)
     paga_por_nome = serializers.CharField(source='paga_por.nome', read_only=True)
+    quitada_por_nome = serializers.CharField(source='quitada_por.nome', read_only=True)
     participantes_count = serializers.SerializerMethodField()
     valor_em_aberto = serializers.SerializerMethodField()
     valor_quitado = serializers.SerializerMethodField()
+    comprovante_url = serializers.SerializerMethodField()
     morador_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         write_only=True,
@@ -271,7 +273,14 @@ class DespesaSerializer(serializers.ModelSerializer):
             'valor_total',
             'paga_por',
             'paga_por_nome',
+            'quitada_por',
+            'quitada_por_nome',
+            'data_vencimento',
             'data_despesa',
+            'status_pagamento',
+            'data_pagamento',
+            'comprovante_pagamento',
+            'comprovante_url',
             'criada_em',
             'participantes_count',
             'valor_em_aberto',
@@ -279,7 +288,7 @@ class DespesaSerializer(serializers.ModelSerializer):
             'morador_ids',
             'divisoes',
         ]
-        read_only_fields = ['id', 'criada_em', 'divisoes']
+        read_only_fields = ['id', 'criada_em', 'divisoes', 'comprovante_url', 'quitada_por_nome']
 
     def get_participantes_count(self, obj):
         return obj.divisoes.count()
@@ -295,10 +304,52 @@ class DespesaSerializer(serializers.ModelSerializer):
     def get_valor_quitado(self, obj):
         return obj.valor_total - self.get_valor_em_aberto(obj)
 
+    def get_comprovante_url(self, obj):
+        if not obj.comprovante_pagamento:
+            return None
+
+        request = self.context.get('request')
+        url = obj.comprovante_pagamento.url
+        return request.build_absolute_uri(url) if request else url
+
     def validate(self, attrs):
         morador_ids = attrs.pop('morador_ids', None)
+
+        if (
+            'status_pagamento' not in attrs
+            and ('data_pagamento' in attrs or 'comprovante_pagamento' in attrs)
+        ):
+            attrs['status_pagamento'] = Despesa.StatusPagamento.PAGA
+
         instance = _build_instance(self, Despesa, attrs)
         instance.full_clean()
+
+        status_pagamento = attrs.get(
+            'status_pagamento',
+            self.instance.status_pagamento if self.instance else Despesa.StatusPagamento.PENDENTE,
+        )
+        data_pagamento = attrs.get(
+            'data_pagamento',
+            self.instance.data_pagamento if self.instance else None,
+        )
+        comprovante_pagamento = attrs.get(
+            'comprovante_pagamento',
+            self.instance.comprovante_pagamento if self.instance else None,
+        )
+
+        if status_pagamento == Despesa.StatusPagamento.PAGA:
+            if not data_pagamento:
+                raise serializers.ValidationError(
+                    {'data_pagamento': 'Informe a data em que a conta foi paga.'}
+                )
+            if not comprovante_pagamento:
+                raise serializers.ValidationError(
+                    {'comprovante_pagamento': 'Anexe o comprovante do pagamento.'}
+                )
+        elif 'status_pagamento' in attrs and status_pagamento == Despesa.StatusPagamento.PENDENTE:
+            attrs['data_pagamento'] = None
+            attrs['comprovante_pagamento'] = None
+            attrs['quitada_por'] = None
 
         participantes = None
         republica = instance.republica

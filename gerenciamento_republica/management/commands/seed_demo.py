@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
 
 from gerenciamento_republica.models import Despesa, DivisaoDespesa, Morador, Pagamento, Republica, Tarefa
@@ -64,7 +65,10 @@ class Command(BaseCommand):
                 'categoria': 'INTERNET',
                 'valor_total': '120.00',
                 'paga_por': morador1,
+                'data_vencimento': '2026-04-05',
                 'data_despesa': '2026-04-04',
+                'status_pagamento': Despesa.StatusPagamento.PAGA,
+                'data_pagamento': '2026-04-05',
             },
         )
         if created:
@@ -72,6 +76,37 @@ class Command(BaseCommand):
             valor = 40
             for morador in participantes:
                 DivisaoDespesa.objects.create(despesa=despesa, morador=morador, valor_devido=valor)
+        despesa.paga_por = morador1
+        despesa.quitada_por = morador2
+        despesa.data_vencimento = despesa.data_vencimento or '2026-04-05'
+        despesa.status_pagamento = Despesa.StatusPagamento.PAGA
+        despesa.data_pagamento = despesa.data_pagamento or '2026-04-05'
+        if not despesa.comprovante_pagamento:
+            despesa.comprovante_pagamento.save(
+                'comprovante-demo.txt',
+                ContentFile('Comprovante de pagamento da internet - demonstracao.'),
+                save=False,
+            )
+        despesa.save()
+
+        despesa_pendente, created = Despesa.objects.get_or_create(
+            republica=republica,
+            titulo='Conta de agua',
+            defaults={
+                'descricao': 'Fatura mensal da companhia',
+                'categoria': 'AGUA',
+                'valor_total': '78.50',
+                'paga_por': morador2,
+                'data_vencimento': '2026-04-12',
+                'data_despesa': '2026-04-08',
+                'status_pagamento': Despesa.StatusPagamento.PENDENTE,
+            },
+        )
+        if created:
+            participantes = [morador1, morador2, morador3]
+            valor_base = [26.17, 26.17, 26.16]
+            for morador, valor in zip(participantes, valor_base):
+                DivisaoDespesa.objects.create(despesa=despesa_pendente, morador=morador, valor_devido=valor)
 
         Pagamento.objects.get_or_create(
             republica=republica,

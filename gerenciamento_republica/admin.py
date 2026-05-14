@@ -18,8 +18,19 @@ class MoradorAdmin(admin.ModelAdmin):
 
 @admin.register(Despesa)
 class DespesaAdmin(admin.ModelAdmin):
-    list_display = ('id', 'titulo', 'categoria', 'valor_total', 'republica', 'paga_por', 'data_despesa')
-    list_filter = ('categoria', 'republica', 'data_despesa')
+    list_display = (
+        'id',
+        'titulo',
+        'categoria',
+        'valor_total',
+        'republica',
+        'paga_por',
+        'status_pagamento',
+        'data_vencimento',
+        'data_pagamento',
+        'data_despesa',
+    )
+    list_filter = ('categoria', 'status_pagamento', 'republica', 'data_despesa')
     search_fields = ('titulo', 'descricao')
 
 

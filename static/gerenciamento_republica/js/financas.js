@@ -1,4 +1,14 @@
 (function () {
+  const CATEGORY_LABELS = {
+    ALUGUEL: "Moradia",
+    ENERGIA: "Energia",
+    AGUA: "Água",
+    INTERNET: "Internet",
+    MERCADO: "Mercado",
+    LIMPEZA: "Limpeza",
+    OUTROS: "Outros",
+  };
+
   function getErrorMessage(data, fallbackMessage) {
     if (!data || typeof data !== "object") return fallbackMessage;
     if (data.detail) return data.detail;
@@ -16,44 +26,105 @@
     return fallbackMessage;
   }
 
-  function buildExpenseOptions(select, despesas) {
-    if (!select) return;
-    select.innerHTML = '<option value="">Aplicar automaticamente na divida mais antiga</option>';
-    despesas.forEach((despesa) => {
-      const option = document.createElement("option");
-      option.value = despesa.id;
-      option.textContent = `${despesa.titulo} - pago por ${despesa.paga_por_nome}`;
-      select.appendChild(option);
-    });
+  function toNumber(value) {
+    return Number(value || 0);
   }
 
-  function buildReferenciaOptions(select, despesas, divisoes, pagadorId, recebedorId, formatDate) {
-    if (!select) return;
-    const divisoesEmAberto = divisoes.filter(
-      (divisao) =>
-        Number(divisao.morador) === Number(pagadorId) &&
-        Number(divisao.saldo_aberto) > 0
-    );
-    const despesasPermitidas = despesas.filter((despesa) => {
-      if (recebedorId && Number(despesa.paga_por) !== Number(recebedorId)) {
-        return false;
-      }
-      return divisoesEmAberto.some((divisao) => Number(divisao.despesa) === Number(despesa.id));
-    });
+  function isPaid(expense) {
+    return expense.status_pagamento === "PAGA";
+  }
 
-    const valorAtual = select.value;
-    select.innerHTML = '<option value="">Aplicar automaticamente na divida mais antiga</option>';
+  function formatCategoryLabel(category) {
+    return CATEGORY_LABELS[category] || category || "Outros";
+  }
 
-    despesasPermitidas.forEach((despesa) => {
-      const option = document.createElement("option");
-      option.value = despesa.id;
-      option.textContent = `${despesa.titulo} - ${formatDate(despesa.data_despesa)}`;
-      select.appendChild(option);
-    });
+  function pluralize(count, singular, plural) {
+    return count === 1 ? singular : plural;
+  }
 
-    if (valorAtual && despesasPermitidas.some((despesa) => Number(despesa.id) === Number(valorAtual))) {
-      select.value = valorAtual;
+  function compareByDate(a, b, key, direction = "asc") {
+    const valueA = a[key] || "";
+    const valueB = b[key] || "";
+    if (valueA === valueB) return 0;
+    if (!valueA) return 1;
+    if (!valueB) return -1;
+    return direction === "asc"
+      ? valueA.localeCompare(valueB)
+      : valueB.localeCompare(valueA);
+  }
+
+  function canConfirmPayment(state, expense) {
+    return Boolean(state.currentUser.morador_id) || state.currentUser.morador_eh_admin;
+  }
+
+  function buildExpenseCard(ctx, expense, variant) {
+    const { state, formatMoney, formatDate, openModal } = ctx;
+    const card = document.createElement("article");
+    card.className = `financas-card financas-card-${variant}`;
+
+    const vencimento = expense.data_vencimento
+      ? `Vence em ${formatDate(expense.data_vencimento)}`
+      : "Sem vencimento informado";
+    const descricao = expense.descricao || "Sem observações adicionais.";
+    const categoria = formatCategoryLabel(expense.categoria);
+    const pagamentoInfo = isPaid(expense)
+      ? `Pago por ${expense.quitada_por_nome || expense.paga_por_nome}`
+      : `Responsável: ${expense.paga_por_nome}`;
+    const dataStatus = isPaid(expense)
+      ? `Quitada em ${formatDate(expense.data_pagamento)}`
+      : vencimento;
+
+    card.innerHTML = `
+      <div class="financas-card-top">
+        <div>
+          <span class="status-chip ${isPaid(expense) ? "status-concluida" : "status-pendente"}">
+            ${isPaid(expense) ? "Pago" : "Pendente"}
+          </span>
+          <h4>${expense.titulo}</h4>
+        </div>
+        <strong>${formatMoney(expense.valor_total)}</strong>
+      </div>
+      <p class="financas-card-description">${descricao}</p>
+      <div class="financas-card-metadata">
+          <span><i class="fa-solid fa-tag"></i> ${categoria}</span>
+          <span><i class="fa-solid fa-calendar-days"></i> ${dataStatus}</span>
+          <span><i class="fa-solid fa-user"></i> ${pagamentoInfo}</span>
+          <span><i class="fa-solid fa-users"></i> ${expense.participantes_count} ${pluralize(expense.participantes_count, "participante", "participantes")}</span>
+      </div>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "financas-card-actions";
+
+    if (!isPaid(expense) && canConfirmPayment(state, expense)) {
+      const button = document.createElement("button");
+      button.className = "btn btn-sm";
+      button.innerHTML = '<i class="fa-solid fa-file-circle-check"></i> Registrar pagamento';
+      button.addEventListener("click", () => {
+        document.getElementById("comprovante-despesa-id").value = expense.id;
+        document.getElementById("comprovante-despesa-titulo").value = expense.titulo;
+        document.querySelector("#comprovante-form input[name='data_pagamento']").value =
+          new Date().toISOString().slice(0, 10);
+        openModal("modal-comprovante");
+      });
+      actions.appendChild(button);
     }
+
+    if (isPaid(expense) && expense.comprovante_url) {
+      const link = document.createElement("a");
+      link.className = "btn btn-outline btn-sm";
+      link.href = expense.comprovante_url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.innerHTML = '<i class="fa-solid fa-paperclip"></i> Ver comprovante';
+      actions.appendChild(link);
+    }
+
+    if (actions.children.length) {
+      card.appendChild(actions);
+    }
+
+    return card;
   }
 
   async function renderFinancas(ctx) {
@@ -64,191 +135,140 @@
       fillSelect,
       formatMoney,
       formatDate,
-      getMeuSaldo,
-      getSaldoDescriptor,
     } = ctx;
 
-    const [despesasResponse, pagamentosResponse, divisoesResponse] = await Promise.all([
+    const [despesasResponse, divisoesResponse] = await Promise.all([
       apiFetch("/api/despesas/"),
-      apiFetch("/api/pagamentos/"),
       apiFetch("/api/divisoes/"),
     ]);
+
     const despesas = await despesasResponse.json();
-    const pagamentos = await pagamentosResponse.json();
     const divisoes = await divisoesResponse.json();
-    const minhasDivisoes = divisoes.filter(
-      (divisao) =>
-        Number(divisao.morador) === Number(state.currentUser.morador_id) &&
-        Number(divisao.saldo_aberto) > 0
+
+    const pendentes = despesas
+      .filter((expense) => !isPaid(expense))
+      .sort((a, b) => compareByDate(a, b, "data_vencimento", "asc"));
+    const pagas = despesas
+      .filter((expense) => isPaid(expense))
+      .sort((a, b) => compareByDate(a, b, "data_pagamento", "desc"));
+    const minhasCotas = divisoes
+      .filter(
+      (divisao) => Number(divisao.morador) === Number(state.currentUser.morador_id)
+      )
+      .sort((a, b) => compareByDate(a, b, "despesa_data", "desc"));
+
+    const totalGastos = despesas.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0);
+    const valorPendente = pendentes.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0);
+    const valorPago = pagas.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0);
+    const minhaParticipacao = minhasCotas.reduce(
+      (acc, divisao) => acc + toNumber(divisao.valor_devido),
+      0
     );
-    const meuSaldo = getMeuSaldo();
-    const saldoInfo = getSaldoDescriptor(meuSaldo ? meuSaldo.saldo : 0);
 
-    document.getElementById("financas-total-despesas").textContent = formatMoney(state.currentResumo.total_despesas);
-    document.getElementById("financas-total-quitado").textContent = formatMoney(state.currentResumo.total_quitado);
-    document.getElementById("financas-total-pendente").textContent = formatMoney(state.currentResumo.total_pendente);
-    document.getElementById("financas-meu-saldo").textContent = formatMoney(meuSaldo ? meuSaldo.saldo : 0);
+    document.getElementById("financas-total-gastos").textContent = formatMoney(totalGastos);
+    document.getElementById("financas-total-pendentes").textContent = String(pendentes.length);
+    document.getElementById("financas-total-pagas").textContent = String(pagas.length);
+    document.getElementById("financas-minha-participacao").textContent = formatMoney(minhaParticipacao);
+    document.getElementById("financas-valor-pendente").textContent = `${formatMoney(valorPendente)} em aberto`;
+    document.getElementById("financas-valor-pago").textContent = `${formatMoney(valorPago)} comprovados`;
+    document.getElementById("financas-meu-status").textContent =
+      minhasCotas.length > 0
+        ? `${minhasCotas.length} ${pluralize(minhasCotas.length, "conta entra", "contas entram")} na sua parcela atual.`
+        : "Você ainda não participa de contas cadastradas.";
+    document.getElementById("financas-pendentes-resumo").textContent =
+      pendentes.length > 0
+        ? `${pendentes.length} ${pluralize(pendentes.length, "conta aguardando pagamento", "contas aguardando pagamento")}`
+        : "Nenhuma conta em aberto no momento.";
+    document.getElementById("financas-pagas-resumo").textContent =
+      pagas.length > 0
+        ? `${pagas.length} ${pluralize(pagas.length, "conta já foi quitada", "contas já foram quitadas")}`
+        : "Sem contas pagas ainda.";
 
-    const meuStatus = document.getElementById("financas-meu-status");
-    meuStatus.className = `badge ${saldoInfo.className}`;
-    meuStatus.textContent = saldoInfo.label;
+    renderList(
+      "financas-pendentes-list",
+      pendentes,
+      (expense) => buildExpenseCard(ctx, expense, "pendente"),
+      "Nenhuma conta pendente no momento."
+    );
+
+    renderList(
+      "financas-pagas-list",
+      pagas,
+      (expense) => buildExpenseCard(ctx, expense, "paga"),
+      "Nenhuma conta paga ainda."
+    );
+
+    renderList(
+      "financas-minhas-cotas-list",
+      minhasCotas,
+      (divisao) => {
+        const item = document.createElement("div");
+        item.className = "expense-item";
+        item.innerHTML = `
+          <div class="expense-item-main">
+            <div class="exp-icon"><i class="fa-solid fa-receipt"></i></div>
+            <div class="expense-item-details">
+              <strong style="display:block;">${divisao.despesa_titulo}</strong>
+              <span class="helper-text">${formatDate(divisao.despesa_data)} • ${formatCategoryLabel(divisao.despesa_categoria)}</span>
+              <span class="helper-text">Lançada por: ${divisao.credor_nome}</span>
+            </div>
+          </div>
+          <strong>${formatMoney(divisao.valor_devido)}</strong>
+        `;
+        return item;
+      },
+      "Você ainda não participa de nenhuma despesa cadastrada."
+    );
 
     renderList(
       "financas-saldos-list",
-      state.currentResumo.moradores,
+      [...state.currentResumo.moradores].sort(
+        (a, b) => toNumber(b.total_devido) - toNumber(a.total_devido)
+      ),
       (morador) => {
-        const div = document.createElement("div");
-        const saldoDescriptor = getSaldoDescriptor(morador.saldo);
-        div.className = "saldo-card";
-        div.innerHTML = `
+        const card = document.createElement("div");
+        const destaque = Number(morador.id) === Number(state.currentUser.morador_id) ? " (você)" : "";
+        card.className = "saldo-card";
+        card.innerHTML = `
           <div class="saldo-card-top">
             <div>
-              <strong style="display:block;">${morador.nome}</strong>
-              <span class="helper-text">${saldoDescriptor.label}</span>
+              <strong style="display:block;">${morador.nome}${destaque}</strong>
+              <span class="helper-text">Participação acumulada nos gastos</span>
             </div>
-            <span class="badge ${saldoDescriptor.className}">${formatMoney(morador.saldo)}</span>
+            <span class="badge badge-warning">Cota ${formatMoney(morador.total_devido)}</span>
           </div>
           <div class="saldo-card-metrics">
-            <div>
-              <span class="helper-text">Pendente</span>
-              <strong>${formatMoney(morador.total_pendente)}</strong>
-            </div>
             <div>
               <span class="helper-text">Quitado</span>
               <strong>${formatMoney(morador.total_quitado)}</strong>
             </div>
             <div>
-              <span class="helper-text">A receber</span>
-              <strong>${formatMoney(morador.total_credito_aberto)}</strong>
-            </div>
-          </div>
-        `;
-        return div;
-      },
-      "Nenhum saldo encontrado."
-    );
-
-    renderList(
-      "financas-despesas-list",
-      despesas,
-      (despesa) => {
-        const div = document.createElement("div");
-        div.className = "expense-item";
-        div.innerHTML = `
-          <div style="display:flex; align-items:center; gap:15px;">
-            <div class="exp-icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
-            <div>
-              <strong style="display:block;">${despesa.titulo}</strong>
-              <span style="font-size:0.8em; color:var(--text-muted); display:block;">
-                ${formatDate(despesa.data_despesa)} - ${despesa.categoria}
-              </span>
-              <span class="helper-text">
-                Pago por ${despesa.paga_por_nome} - ${despesa.participantes_count} participante(s)
-              </span>
-              <span class="helper-text">
-                Quitado: ${formatMoney(despesa.valor_quitado)} - Em aberto: ${formatMoney(despesa.valor_em_aberto)}
-              </span>
-            </div>
-          </div>
-          <strong>${formatMoney(despesa.valor_total)}</strong>
-        `;
-        return div;
-      },
-      "Nenhuma despesa cadastrada."
-    );
-
-    renderList(
-      "financas-divisoes-list",
-      minhasDivisoes,
-      (divisao) => {
-        const div = document.createElement("div");
-        div.className = "expense-item";
-        div.innerHTML = `
-          <div style="display:flex; align-items:center; gap:15px;">
-            <div class="exp-icon" style="background: #fff3f0; color: var(--danger);">
-              <i class="fa-solid fa-file-circle-exclamation"></i>
+              <span class="helper-text">Pendente</span>
+              <strong>${formatMoney(morador.total_pendente)}</strong>
             </div>
             <div>
-              <strong style="display:block;">${divisao.despesa_titulo}</strong>
-              <span style="font-size:0.8em; color:var(--text-muted); display:block;">
-                ${formatDate(divisao.despesa_data)} - ${divisao.despesa_categoria}
-              </span>
-              <span class="helper-text">Credor: ${divisao.credor_nome}</span>
-              <span class="helper-text">
-                Devido: ${formatMoney(divisao.valor_devido)} - Pago: ${formatMoney(divisao.valor_pago)}
-              </span>
+              <span class="helper-text">Saldo estimado</span>
+              <strong>${formatMoney(morador.saldo)}</strong>
             </div>
           </div>
-          <span class="badge badge-danger">${formatMoney(divisao.saldo_aberto)}</span>
         `;
-        return div;
+        return card;
       },
-      "Voce nao possui dividas em aberto no momento."
-    );
-
-    renderList(
-      "financas-pagamentos-list",
-      pagamentos,
-      (pagamento) => {
-        const resumoItens = (pagamento.itens || [])
-          .map((item) => `${item.despesa_titulo}: ${formatMoney(item.valor_aplicado)}`)
-          .join(" | ");
-
-        const div = document.createElement("div");
-        div.className = "expense-item";
-        div.innerHTML = `
-          <div style="display:flex; align-items:center; gap:15px;">
-            <div class="exp-icon" style="background: var(--success); color: white">
-              <i class="fa-brands fa-pix"></i>
-            </div>
-            <div>
-              <strong style="display:block;">${pagamento.pagador_nome} pagou ${pagamento.recebedor_nome}</strong>
-              <span style="font-size:0.8em; color:var(--text-muted); display:block;">
-                ${formatDate(pagamento.data_pagamento)}
-              </span>
-              <span class="helper-text">${pagamento.observacao || "Sem observacao"}</span>
-              <span class="helper-text">${resumoItens || "Pagamento sem aplicacoes listadas"}</span>
-            </div>
-          </div>
-          <strong>${formatMoney(pagamento.valor)}</strong>
-        `;
-        return div;
-      },
-      "Nenhum pagamento registrado."
+      "Nenhum morador encontrado."
     );
 
     fillSelect(document.getElementById("despesa-paga-por"), false);
     fillSelect(document.getElementById("despesa-moradores"), false);
-    fillSelect(document.getElementById("pagamento-pagador"), false);
-    fillSelect(document.getElementById("pagamento-recebedor"), false);
-    buildExpenseOptions(document.getElementById("pagamento-referencia-despesa"), despesas);
-
     Array.from(document.getElementById("despesa-moradores").options).forEach((option) => {
       option.selected = true;
     });
-
-    const pagadorSelect = document.getElementById("pagamento-pagador");
-    const recebedorSelect = document.getElementById("pagamento-recebedor");
-    const referenciaSelect = document.getElementById("pagamento-referencia-despesa");
-    const refreshReferencia = () =>
-      buildReferenciaOptions(
-        referenciaSelect,
-        despesas,
-        divisoes,
-        pagadorSelect.value,
-        recebedorSelect.value,
-        formatDate
-      );
-
-    pagadorSelect.onchange = refreshReferencia;
-    recebedorSelect.onchange = refreshReferencia;
-    refreshReferencia();
   }
 
   async function submitDespesa(ctx, event) {
     event.preventDefault();
     const { state, apiFetch, closeModal, reloadFinancialSources, showToast } = ctx;
     const form = event.currentTarget;
+
     const payload = {
       republica: state.currentUser.republica_id,
       titulo: form.titulo.value,
@@ -256,17 +276,24 @@
       categoria: form.categoria.value,
       valor_total: form.valor_total.value,
       paga_por: Number(form.paga_por.value),
+      data_vencimento: form.data_vencimento.value || null,
       data_despesa: form.data_despesa.value,
-      morador_ids: Array.from(document.getElementById("despesa-moradores").selectedOptions).map((option) =>
-        Number(option.value)
+      morador_ids: Array.from(document.getElementById("despesa-moradores").selectedOptions).map(
+        (option) => Number(option.value)
       ),
     };
-    const response = await apiFetch("/api/despesas/", { method: "POST", body: JSON.stringify(payload) });
+
+    const response = await apiFetch("/api/despesas/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
     const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      showToast(getErrorMessage(data, "Nao foi possivel salvar a despesa."), "danger");
+      showToast(getErrorMessage(data, "Não foi possível salvar a despesa."), "danger");
       return;
     }
+
     form.reset();
     closeModal("modal-despesa");
     await reloadFinancialSources();
@@ -274,36 +301,49 @@
     showToast("Despesa cadastrada com sucesso!", "success");
   }
 
-  async function submitPagamento(ctx, event) {
+  async function submitComprovante(ctx, event) {
     event.preventDefault();
-    const { state, apiFetch, closeModal, reloadFinancialSources, showToast } = ctx;
+    const { apiFetch, closeModal, reloadFinancialSources, showToast } = ctx;
     const form = event.currentTarget;
-    const referenciaDespesa = form.referencia_despesa.value ? Number(form.referencia_despesa.value) : null;
-    const payload = {
-      republica: state.currentUser.republica_id,
-      pagador: Number(form.pagador.value),
-      recebedor: Number(form.recebedor.value),
-      valor: form.valor.value,
-      referencia_despesa: referenciaDespesa,
-      observacao: form.observacao.value,
-      data_pagamento: form.data_pagamento.value,
-    };
-    const response = await apiFetch("/api/pagamentos/", { method: "POST", body: JSON.stringify(payload) });
+    const despesaId = document.getElementById("comprovante-despesa-id").value;
+    const comprovante = form.comprovante_pagamento.files[0];
+
+    const payload = new FormData();
+    payload.append("status_pagamento", "PAGA");
+    payload.append("data_pagamento", form.data_pagamento.value);
+    if (comprovante) {
+      payload.append("comprovante_pagamento", comprovante);
+    }
+
+    const response = await apiFetch(`/api/despesas/${despesaId}/`, {
+      method: "PATCH",
+      body: payload,
+    });
     const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      showToast(getErrorMessage(data, "Nao foi possivel registrar o pagamento."), "danger");
+      showToast(getErrorMessage(data, "Não foi possível registrar o pagamento."), "danger");
       return;
     }
+
     form.reset();
-    closeModal("modal-pagamento");
+    closeModal("modal-comprovante");
     await reloadFinancialSources();
     await renderFinancas(ctx);
-    showToast("Pagamento registrado e aplicado com sucesso!", "success");
+    showToast("Pagamento registrado com comprovante!", "success");
   }
 
   window.RABBU_APP.initPage(async (ctx) => {
-    document.getElementById("despesa-form").addEventListener("submit", (event) => submitDespesa(ctx, event));
-    document.getElementById("pagamento-form").addEventListener("submit", (event) => submitPagamento(ctx, event));
+    const despesaForm = document.getElementById("despesa-form");
+    const comprovanteForm = document.getElementById("comprovante-form");
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    despesaForm.querySelector("input[name='data_despesa']").value = hoje;
+    comprovanteForm.querySelector("input[name='data_pagamento']").value = hoje;
+
+    despesaForm.addEventListener("submit", (event) => submitDespesa(ctx, event));
+    comprovanteForm.addEventListener("submit", (event) => submitComprovante(ctx, event));
+
     await renderFinancas(ctx);
   });
 })();

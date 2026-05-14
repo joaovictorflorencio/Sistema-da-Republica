@@ -58,6 +58,10 @@ class Despesa(models.Model):
         LIMPEZA = 'LIMPEZA', 'Limpeza'
         OUTROS = 'OUTROS', 'Outros'
 
+    class StatusPagamento(models.TextChoices):
+        PENDENTE = 'PENDENTE', 'Pendente'
+        PAGA = 'PAGA', 'Paga'
+
     republica = models.ForeignKey(
         Republica,
         on_delete=models.CASCADE,
@@ -76,7 +80,26 @@ class Despesa(models.Model):
         on_delete=models.PROTECT,
         related_name='despesas_pagas',
     )
+    quitada_por = models.ForeignKey(
+        Morador,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='despesas_quitadas',
+    )
+    data_vencimento = models.DateField(null=True, blank=True)
     data_despesa = models.DateField()
+    status_pagamento = models.CharField(
+        max_length=20,
+        choices=StatusPagamento.choices,
+        default=StatusPagamento.PENDENTE,
+    )
+    data_pagamento = models.DateField(null=True, blank=True)
+    comprovante_pagamento = models.FileField(
+        upload_to='comprovantes/',
+        null=True,
+        blank=True,
+    )
     criada_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -96,6 +119,23 @@ class Despesa(models.Model):
                 raise ValidationError(
                     {'paga_por': 'O morador pagante precisa pertencer a mesma republica da despesa.'}
                 )
+        if self.quitada_por_id and self.republica_id:
+            if self.quitada_por.republica_id != self.republica_id:
+                raise ValidationError(
+                    {'quitada_por': 'Quem quitou a conta precisa pertencer a mesma republica da despesa.'}
+                )
+        if self.status_pagamento == self.StatusPagamento.PAGA:
+            if not self.data_pagamento:
+                raise ValidationError(
+                    {'data_pagamento': 'Informe a data do pagamento ao marcar a despesa como paga.'}
+                )
+            if not self.comprovante_pagamento:
+                raise ValidationError(
+                    {'comprovante_pagamento': 'Anexe o comprovante para concluir o pagamento.'}
+                )
+        if self.status_pagamento == self.StatusPagamento.PENDENTE:
+            self.data_pagamento = None
+            self.quitada_por = None
 
     def __str__(self):
         return f'{self.titulo} - R$ {self.valor_total}'

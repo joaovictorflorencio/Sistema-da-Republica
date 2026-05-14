@@ -24,6 +24,26 @@ Estudantes e pessoas que moram em republicas ou em outros tipos de moradia compa
 
 ## Como rodar o projeto
 
+### Jeito mais simples no Windows
+
+Se voce estiver no Windows, basta abrir a pasta do projeto e executar:
+
+`iniciar_rabbu.bat`
+
+Esse arquivo faz automaticamente:
+- cria o ambiente virtual, se ainda nao existir
+- instala as dependencias
+- aplica as migracoes
+- carrega os dados de demonstracao
+- abre o navegador
+- inicia o servidor
+
+Depois disso, o sistema abre em:
+
+`http://127.0.0.1:8000/login/`
+
+### Jeito manual
+
 Se voce acabou de baixar o projeto, estes comandos ja deixam tudo pronto:
 
 ```powershell

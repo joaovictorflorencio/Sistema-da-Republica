@@ -3,101 +3,107 @@
 
 {% block title %}Financas - RABBU{% endblock %}
 {% block page_icon %}<i class="fa-solid fa-wallet"></i>{% endblock %}
-{% block page_title %}Financas{% endblock %}
+{% block page_title %}Controle de gastos{% endblock %}
 
 {% block content %}
-<div class="grid-4">
-  <div class="card stat-card financas-hero-card">
-    <div class="stat-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+<div class="financas-summary-grid">
+  <div class="card stat-card financas-summary-card financas-hero-card">
+    <div class="stat-icon"><i class="fa-solid fa-sack-dollar"></i></div>
     <div class="stat-info">
-      <h4>Meu saldo</h4>
-      <h2 id="financas-meu-saldo">R$ 0,00</h2>
-      <span id="financas-meu-status" class="badge badge-success">Tudo em dia</span>
+      <h4>Total em gastos</h4>
+      <h2 id="financas-total-gastos">R$ 0,00</h2>
+      <span class="helper-text">Tudo o que já foi lançado na república.</span>
     </div>
   </div>
 
-  <div class="card stat-card">
-    <div class="stat-icon"><i class="fa-solid fa-file-invoice-dollar"></i></div>
-    <div class="stat-info">
-      <h4>Total em despesas</h4>
-      <h2 id="financas-total-despesas">R$ 0,00</h2>
-    </div>
-  </div>
-
-  <div class="card stat-card">
-    <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
-    <div class="stat-info">
-      <h4>Total quitado</h4>
-      <h2 id="financas-total-quitado">R$ 0,00</h2>
-    </div>
-  </div>
-
-  <div class="card stat-card">
+  <div class="card stat-card financas-summary-card">
     <div class="stat-icon"><i class="fa-solid fa-hourglass-half"></i></div>
     <div class="stat-info">
-      <h4>Total pendente</h4>
-      <h2 id="financas-total-pendente">R$ 0,00</h2>
+      <h4>Contas pendentes</h4>
+      <h2 id="financas-total-pendentes">0</h2>
+      <span id="financas-valor-pendente" class="helper-text">R$ 0,00 em aberto</span>
+    </div>
+  </div>
+
+  <div class="card stat-card financas-summary-card">
+    <div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div>
+    <div class="stat-info">
+      <h4>Contas pagas</h4>
+      <h2 id="financas-total-pagas">0</h2>
+      <span id="financas-valor-pago" class="helper-text">R$ 0,00 comprovados</span>
+    </div>
+  </div>
+
+  <div class="card stat-card financas-summary-card">
+    <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
+    <div class="stat-info">
+      <h4>Minha participação</h4>
+      <h2 id="financas-minha-participacao">R$ 0,00</h2>
+      <span id="financas-meu-status" class="helper-text">Sua parcela acumulada nas contas da casa.</span>
     </div>
   </div>
 </div>
 
 <div class="card">
-  <div class="card-header" style="flex-wrap: wrap; gap: 15px">
+  <div class="card-header financas-board-toolbar">
     <div>
-      <h3 class="card-title"><i class="fa-solid fa-wallet"></i> Visao financeira da casa</h3>
-      <p class="helper-text" style="margin-top: 8px;">Acompanhe as despesas, quanto cada morador ainda precisa quitar e o historico de pagamentos aplicados.</p>
+      <h3 class="card-title"><i class="fa-solid fa-receipt"></i> Quadro de gastos da casa</h3>
+      <p class="helper-text financas-section-copy">
+        Acompanhe as contas da república, separadas entre pendentes e já quitadas com comprovante.
+      </p>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <button class="btn" data-open-modal="modal-despesa">
-        <i class="fa-solid fa-plus"></i> Nova despesa
-      </button>
-      <button class="btn btn-outline" data-open-modal="modal-pagamento">
-        <i class="fa-brands fa-pix"></i> Registrar pagamento
-      </button>
-    </div>
+    <button class="btn" data-open-modal="modal-despesa">
+      <i class="fa-solid fa-plus"></i> Nova despesa
+    </button>
   </div>
 </div>
 
-<div class="grid-2">
-  <div class="card">
-    <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-receipt"></i> Despesas da casa</h3>
-      <span class="badge badge-warning">Historico</span>
+<div class="financas-board">
+  <section class="financas-column">
+    <div class="financas-column-header">
+      <div>
+        <strong>Contas pendentes</strong>
+        <span id="financas-pendentes-resumo">Sem despesas em aberto.</span>
+      </div>
+      <span class="badge badge-warning">Pendente</span>
     </div>
-    <div id="financas-despesas-list" class="expense-list">
-      <div class="empty-state">Carregando despesas...</div>
+    <div id="financas-pendentes-list" class="financas-column-body">
+      <div class="empty-state">Carregando contas pendentes...</div>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-file-circle-exclamation"></i> Minhas dividas em aberto</h3>
-      <span class="badge badge-danger">Acompanhamento</span>
+  <section class="financas-column">
+    <div class="financas-column-header">
+      <div>
+        <strong>Contas pagas</strong>
+        <span id="financas-pagas-resumo">Sem contas pagas ainda.</span>
+      </div>
+      <span class="badge badge-success">Pago</span>
     </div>
-    <div id="financas-divisoes-list" class="expense-list">
-      <div class="empty-state">Carregando dividas...</div>
+    <div id="financas-pagas-list" class="financas-column-body">
+      <div class="empty-state">Carregando contas pagas...</div>
     </div>
-  </div>
+  </section>
 </div>
 
-<div class="grid-2">
+<div class="grid-2 financas-bottom-grid">
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-people-arrows"></i> Pagamentos aplicados</h3>
-      <span class="badge badge-success">Historico</span>
+      <h3 class="card-title"><i class="fa-solid fa-file-invoice-dollar"></i> Minhas cotas</h3>
+      <span class="helper-text">Quanto você participa em cada conta da república.</span>
     </div>
-    <div id="financas-pagamentos-list" class="expense-list">
-      <div class="empty-state">Carregando pagamentos...</div>
+    <div id="financas-minhas-cotas-list" class="expense-list">
+      <div class="empty-state">Carregando suas cotas...</div>
     </div>
   </div>
 
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Saldo por morador</h3>
-      <span class="helper-text">Valores positivos indicam quem tem a receber. Valores negativos indicam quem ainda deve.</span>
+      <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Resumo por morador</h3>
+      <span class="helper-text">Visão simples do quanto cada pessoa já acumulou em despesas da casa.</span>
     </div>
     <div id="financas-saldos-list" class="financas-saldos-grid">
-      <div class="empty-state">Carregando saldos...</div>
+      <div class="empty-state">Carregando participações...</div>
     </div>
   </div>
 </div>
@@ -109,95 +115,108 @@
 
 {% block modals %}
 <div class="modal-overlay" id="modal-despesa">
-  <div class="modal-content">
+  <div class="modal-content modal-wide">
     <div class="modal-header">
-      <h3 style="margin: 0"><i class="fa-solid fa-file-invoice-dollar"></i> Lancar conta</h3>
-      <button class="btn-outline" style="border: none; font-size: 1.5em; padding: 0" data-close-modal="modal-despesa">x</button>
+      <h3 style="margin: 0"><i class="fa-solid fa-file-invoice-dollar"></i> Cadastrar despesa</h3>
+      <div class="modal-header-actions">
+        <button class="btn btn-sm" type="submit" form="despesa-form">
+          <i class="fa-solid fa-floppy-disk"></i> Salvar despesa
+        </button>
+        <button class="btn-outline modal-close-btn" data-close-modal="modal-despesa" aria-label="Fechar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
     </div>
     <form id="despesa-form">
-      <div class="form-group">
-        <label>Titulo</label>
-        <input type="text" class="form-control" name="titulo" placeholder="Ex: Luz" required />
-      </div>
-      <div class="form-row">
+      <div class="modal-form-body">
         <div class="form-group">
-          <label>Valor (R$)</label>
-          <input type="number" class="form-control" name="valor_total" min="0.01" step="0.01" required />
+          <label>Título</label>
+          <input type="text" class="form-control" name="titulo" placeholder="Ex: Conta de luz" required />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Valor (R$)</label>
+            <input type="number" class="form-control" name="valor_total" min="0.01" step="0.01" required />
+          </div>
+          <div class="form-group">
+            <label>Vencimento</label>
+            <input type="date" class="form-control" name="data_vencimento" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Data do gasto</label>
+            <input type="date" class="form-control" name="data_despesa" required />
+          </div>
+          <div class="form-group">
+            <label>Categoria</label>
+            <select class="form-control" name="categoria" required>
+              <option value="ALUGUEL">Moradia</option>
+              <option value="ENERGIA">Energia</option>
+              <option value="AGUA">Água</option>
+              <option value="INTERNET">Internet</option>
+              <option value="MERCADO">Mercado</option>
+              <option value="LIMPEZA">Limpeza</option>
+              <option value="OUTROS">Outros</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
-          <label>Data</label>
-          <input type="date" class="form-control" name="data_despesa" required />
+          <label>Descrição</label>
+          <input type="text" class="form-control" name="descricao" placeholder="Observação opcional" />
         </div>
+        <div class="form-group">
+          <label>Responsável pelo pagamento</label>
+          <select class="form-control" name="paga_por" id="despesa-paga-por" required></select>
+        </div>
+        <div class="form-group">
+          <label>Dividir entre</label>
+          <select class="form-control despesas-participantes-select" name="morador_ids" id="despesa-moradores" multiple size="4" required></select>
+        </div>
+        <p class="helper-text financas-modal-note">Use Ctrl para selecionar mais de um morador.</p>
       </div>
-      <div class="form-group">
-        <label>Categoria</label>
-        <select class="form-control" name="categoria" required>
-          <option value="ALUGUEL">Moradia</option>
-          <option value="ENERGIA">Energia</option>
-          <option value="AGUA">Agua</option>
-          <option value="INTERNET">Internet</option>
-          <option value="MERCADO">Mercado</option>
-          <option value="LIMPEZA">Limpeza</option>
-          <option value="OUTROS">Outros</option>
-        </select>
+      <div class="modal-actions">
+        <button class="btn modal-submit-btn" type="submit">Salvar despesa</button>
       </div>
-      <div class="form-group">
-        <label>Descricao</label>
-        <input type="text" class="form-control" name="descricao" placeholder="Observacao opcional" />
-      </div>
-      <div class="form-group">
-        <label>Pago por</label>
-        <select class="form-control" name="paga_por" id="despesa-paga-por" required></select>
-      </div>
-      <div class="form-group">
-        <label>Dividir entre</label>
-        <select class="form-control" name="morador_ids" id="despesa-moradores" multiple size="5" required></select>
-      </div>
-      <p class="helper-text" style="margin-bottom:15px;">Use Ctrl para selecionar mais de um morador.</p>
-      <button class="btn" style="width: 100%; margin-top: 10px" type="submit">Salvar e dividir</button>
     </form>
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-pagamento">
+<div class="modal-overlay" id="modal-comprovante">
   <div class="modal-content">
     <div class="modal-header">
-      <h3 style="margin: 0"><i class="fa-brands fa-pix" style="color: var(--success)"></i> Registrar pagamento</h3>
-      <button class="btn-outline" style="border: none; font-size: 1.5em; padding: 0" data-close-modal="modal-pagamento">x</button>
-    </div>
-    <form id="pagamento-form">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Pagador</label>
-          <select class="form-control" name="pagador" id="pagamento-pagador" required></select>
-        </div>
-        <div class="form-group">
-          <label>Recebedor</label>
-          <select class="form-control" name="recebedor" id="pagamento-recebedor" required></select>
-        </div>
+      <h3 style="margin: 0"><i class="fa-solid fa-file-circle-check"></i> Registrar pagamento</h3>
+      <div class="modal-header-actions">
+        <button class="btn btn-sm" type="submit" form="comprovante-form">
+          <i class="fa-solid fa-check"></i> Registrar
+        </button>
+        <button class="btn-outline modal-close-btn" data-close-modal="modal-comprovante" aria-label="Fechar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
       </div>
-      <div class="form-row">
+    </div>
+    <form id="comprovante-form">
+      <input type="hidden" name="despesa_id" id="comprovante-despesa-id" />
+      <div class="modal-form-body">
         <div class="form-group">
-          <label>Valor</label>
-          <input type="number" class="form-control" name="valor" min="0.01" step="0.01" required />
+          <label>Despesa</label>
+          <input type="text" class="form-control" id="comprovante-despesa-titulo" disabled />
         </div>
         <div class="form-group">
           <label>Data do pagamento</label>
           <input type="date" class="form-control" name="data_pagamento" required />
         </div>
+        <div class="form-group">
+          <label>Comprovante ou boleto quitado</label>
+          <input type="file" class="form-control" name="comprovante_pagamento" accept=".pdf,.png,.jpg,.jpeg,.webp" required />
+        </div>
+        <p class="helper-text financas-modal-note">
+          Esse arquivo vai servir como prova de que a conta foi quitada.
+        </p>
       </div>
-      <div class="form-group">
-        <label>Despesa de referencia</label>
-        <select class="form-control" name="referencia_despesa" id="pagamento-referencia-despesa">
-          <option value="">Aplicar automaticamente na divida mais antiga</option>
-        </select>
+      <div class="modal-actions">
+        <button class="btn modal-submit-btn" type="submit">Registrar pagamento</button>
       </div>
-      <div class="form-group">
-        <label>Observacao</label>
-        <input type="text" class="form-control" name="observacao" placeholder="Ex: acerto internet" />
-      </div>
-      <p class="helper-text" style="margin-bottom:15px;">Se voce escolher uma despesa, o pagamento sera abatido primeiro nela. Se deixar em branco, o sistema aplica no debito mais antigo entre as partes.</p>
-      <button class="btn" style="width: 100%; margin-top: 10px" type="submit">Registrar pagamento</button>
     </form>
   </div>
 </div>

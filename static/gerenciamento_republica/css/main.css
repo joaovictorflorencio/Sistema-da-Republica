@@ -67,16 +67,48 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 .tab-item.active { color: var(--primary); border-bottom-color: var(--primary); }
 .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 18px; border: 1px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 15px; background: #fff; transition: var(--transition); }
 .exp-icon { width: 50px; height: 50px; border-radius: 14px; background: #f0f5ff; color: var(--primary); display: flex; justify-content: center; align-items: center; font-size: 1.4em; }
+.financas-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 25px; margin-bottom: 30px; }
+.financas-summary-card { min-height: 190px; justify-content: center; }
+.financas-summary-card .stat-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.financas-summary-card .stat-info h2 { line-height: 1.08; }
+.financas-summary-card .helper-text { display: block; line-height: 1.5; max-width: 26ch; }
 .financas-hero-card { background: linear-gradient(135deg, #ffffff, #eef4ff); border-color: rgba(0, 86, 254, 0.12); }
+.financas-board-toolbar { flex-wrap: wrap; gap: 15px; }
+.financas-section-copy { margin-top: 8px; max-width: 680px; line-height: 1.6; }
+.financas-bottom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .financas-saldos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
 .saldo-card { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04); }
 .saldo-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; margin-bottom: 18px; }
 .saldo-card-metrics { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .saldo-card-metrics div { padding-top: 12px; border-top: 1px solid #edf2f7; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.financas-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 25px; margin-bottom: 30px; }
+.financas-column { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: 0 10px 25px rgba(0,0,0,0.05); overflow: hidden; }
+.financas-column-header { padding: 22px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.financas-column-header > div { min-width: 0; }
+.financas-column-header strong { display: block; font-size: 1.05em; margin-bottom: 6px; }
+.financas-column-header span:not(.badge) { color: var(--text-muted); font-size: 0.85em; display: block; line-height: 1.5; }
+.financas-column-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; min-height: 320px; background: #f8fafc; }
+.financas-column-body .empty-state { margin: auto 0; }
+.financas-card { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05); }
+.financas-card-pendente { border-left: 5px solid var(--warning); }
+.financas-card-paga { border-left: 5px solid var(--success); }
+.financas-card-top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
+.financas-card-top > div { flex: 1; min-width: 0; }
+.financas-card-top > strong { font-size: 1.75rem; line-height: 1.05; white-space: nowrap; flex-shrink: 0; }
+.financas-card-top h4 { margin-top: 10px; font-size: 1.05em; line-height: 1.4; overflow-wrap: anywhere; }
+.financas-card-description { color: var(--text-muted); margin-bottom: 14px; line-height: 1.6; }
+.financas-card-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; font-size: 0.82rem; color: var(--text-muted); }
+.financas-card-metadata span { display: flex; gap: 8px; align-items: flex-start; line-height: 1.45; min-width: 0; }
+.financas-card-metadata i { color: #94a3b8; margin-top: 2px; }
+.financas-card-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .financas-tips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 .fin-tip { border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; background: #f8fafc; }
 .fin-tip strong { display: block; margin-bottom: 8px; }
 .fin-tip span { color: var(--text-muted); line-height: 1.5; display: block; }
+.expense-item-main { display: flex; align-items: flex-start; gap: 15px; min-width: 0; flex: 1; }
+.expense-item-details { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.expense-item-details strong { line-height: 1.4; overflow-wrap: anywhere; }
+.expense-item > strong { flex-shrink: 0; }
 
 /* KANBAN */
 .kanban-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; align-items: start; }
@@ -135,14 +167,23 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(11,17,33,0.7); backdrop-filter: blur(8px); display: none; justify-content: center; align-items: center; z-index: 2000; padding: 20px; }
 .modal-overlay.active { display: flex; }
-.modal-content { background: #fff; padding: 35px; border-radius: var(--radius-lg); width: 100%; max-width: 550px; animation: modalIn 0.3s ease-out forwards; }
+.modal-content { background: #fff; padding: 35px; border-radius: var(--radius-lg); width: 100%; max-width: 550px; max-height: calc(100vh - 40px); overflow: hidden; animation: modalIn 0.3s ease-out forwards; display: flex; flex-direction: column; }
+.modal-content.modal-wide { max-width: 680px; }
 @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
 .modal-header i { color: var(--primary); font-size: 1.2em; }
+.modal-header-actions { display: flex; align-items: center; gap: 10px; }
+.modal-close-btn { border: none; font-size: 1.1em; padding: 0; min-width: auto; width: 42px; height: 42px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.modal-content form { display: flex; flex-direction: column; min-height: 0; gap: 0; }
+.modal-form-body { overflow-y: auto; padding-right: 6px; }
 .form-group { margin-bottom: 18px; }
 .form-group label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9em; }
 .form-control { width: 100%; padding: 15px; border: 2px solid #e2e8f0; border-radius: var(--radius-md); font-family: inherit; font-size: 1em; outline: none; transition: var(--transition); background: #f8fafc; font-weight: 500; }
 .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(0,86,254,0.15); }
+.modal-actions { background: #fff; padding-top: 16px; margin-top: 12px; border-top: 1px solid var(--border-color); flex-shrink: 0; }
+.modal-submit-btn { width: 100%; margin-top: 10px; }
+.financas-modal-note { margin-bottom: 15px; line-height: 1.5; }
+.despesas-participantes-select { min-height: 120px; }
 
 /* TOASTS */
 .toast-container { position: fixed; top: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
@@ -170,4 +211,36 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 .poll-percent { position: relative; z-index: 2; font-weight: 800; color: var(--primary); pointer-events: none; opacity: 0; transition: opacity 0.5s ease 0.6s; }
 .poll-option.show-results .poll-percent { opacity: 1; }
 
-@media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; height: auto; border-radius: 0; padding: 15px; flex-direction: row; justify-content: space-between; align-items: center; position: fixed; bottom: 0; z-index: 100; margin: 0; } .brand, .republic-badge { display: none; } .nav-menu { flex-direction: row; justify-content: space-around; width: 100%; padding: 0; gap: 0; } .nav-btn { flex-direction: column; padding: 10px; gap: 5px; font-size: 0.7em; } .nav-btn i { font-size: 1.8em; } .content-area { padding: 0 20px 100px; } .fab-container { bottom: 100px; right: 20px; } }
+@media (max-width: 768px) { body { flex-direction: column; } .sidebar { width: 100%; height: auto; border-radius: 0; padding: 15px; flex-direction: row; justify-content: space-between; align-items: center; position: fixed; bottom: 0; z-index: 100; margin: 0; } .brand, .republic-badge { display: none; } .nav-menu { flex-direction: row; justify-content: space-around; width: 100%; padding: 0; gap: 0; } .nav-btn { flex-direction: column; padding: 10px; gap: 5px; font-size: 0.7em; } .nav-btn i { font-size: 1.8em; } .content-area { padding: 0 20px 100px; } .fab-container { bottom: 100px; right: 20px; } .financas-board, .grid-2 { grid-template-columns: 1fr; } }
+
+@media (max-width: 1024px) {
+  .financas-card-metadata {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .financas-summary-grid,
+  .financas-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .financas-column-header,
+  .financas-card-top,
+  .expense-item,
+  .saldo-card-top,
+  .saldo-card-metrics div,
+  .modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .financas-card-top > strong,
+  .expense-item > strong {
+    white-space: normal;
+  }
+
+  .modal-content {
+    padding: 24px;
+  }
+}
