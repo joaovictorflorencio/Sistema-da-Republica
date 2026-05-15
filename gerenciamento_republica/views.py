@@ -25,6 +25,7 @@ from .serializers import (
     LoginSerializer,
     MoradorSerializer,
     PagamentoSerializer,
+    PerfilUpdateSerializer,
     RepublicaResumoSerializer,
     RepublicaSerializer,
     TarefaSerializer,
@@ -51,6 +52,10 @@ def tarefas_page(request):
     return render(request, 'gerenciamento_republica/tarefas.html', {'page_key': 'tarefas'})
 
 
+def perfil_page(request):
+    return render(request, 'gerenciamento_republica/perfil.html', {'page_key': 'perfil'})
+
+
 def get_user_republica(user):
     morador = getattr(user, 'morador', None)
     return morador.republica if morador else None
@@ -61,67 +66,36 @@ def get_user_morador(user):
 
 
 def construir_resumo_financeiro_morador(morador):
-    divisoes = list(
-        morador.divisoes_despesa.select_related('despesa', 'despesa__paga_por')
+    despesas_responsaveis = morador.despesas_pagas.filter(
+        republica=morador.republica
     )
-    divisoes_creditoras = list(
-        DivisaoDespesa.objects.select_related('despesa', 'morador')
-        .filter(
-            despesa__republica=morador.republica,
-            despesa__paga_por=morador,
-        )
-        .exclude(morador=morador)
-    )
-
-    total_pago_em_despesas = morador.despesas_pagas.aggregate(
+    total_assumido = despesas_responsaveis.aggregate(
         total=Coalesce(Sum('valor_total'), Decimal('0.00'))
     )['total']
-    total_pago_em_acertos = PagamentoDivisao.objects.filter(
-        pagamento__pagador=morador
-    ).aggregate(total=Coalesce(Sum('valor_aplicado'), Decimal('0.00')))['total']
-    total_recebido_em_acertos = PagamentoDivisao.objects.filter(
-        pagamento__recebedor=morador
-    ).aggregate(total=Coalesce(Sum('valor_aplicado'), Decimal('0.00')))['total']
-
-    total_devido = sum((divisao.valor_devido for divisao in divisoes), Decimal('0.00'))
-    total_quitado = sum(
-        (
-            (
-                divisao.valor_devido
-                if divisao.despesa.paga_por_id == morador.id
-                else divisao.valor_pago
-            )
-            for divisao in divisoes
-        ),
-        start=Decimal('0.00'),
-    )
-    total_pendente = sum(
-        (
-            (
-                Decimal('0.00')
-                if divisao.despesa.paga_por_id == morador.id
-                else divisao.saldo_aberto
-            )
-            for divisao in divisoes
-        ),
-        start=Decimal('0.00'),
-    )
-    total_credito_aberto = sum(
-        (divisao.saldo_aberto for divisao in divisoes_creditoras),
-        Decimal('0.00'),
-    )
+    total_quitado = despesas_responsaveis.filter(
+        status_pagamento=Despesa.StatusPagamento.PAGA
+    ).aggregate(
+        total=Coalesce(Sum('valor_total'), Decimal('0.00'))
+    )['total']
+    total_pendente = total_assumido - total_quitado
+    total_pago_real = morador.despesas_quitadas.filter(
+        republica=morador.republica,
+        status_pagamento=Despesa.StatusPagamento.PAGA,
+    ).aggregate(
+        total=Coalesce(Sum('valor_total'), Decimal('0.00'))
+    )['total']
 
     return {
         'id': morador.id,
         'nome': morador.nome,
-        'total_pago_em_despesas': total_pago_em_despesas,
-        'total_devido': total_devido,
+        'total_pago_em_despesas': total_pago_real,
+        'total_devido': total_assumido,
         'total_quitado': total_quitado,
         'total_pendente': total_pendente,
-        'total_pago_em_acertos': total_pago_em_acertos,
-        'total_recebido_em_acertos': total_recebido_em_acertos,
-        'total_credito_aberto': total_credito_aberto,
-        'saldo': total_credito_aberto - total_pendente,
+        'total_pago_em_acertos': Decimal('0.00'),
+        'total_recebido_em_acertos': Decimal('0.00'),
+        'total_credito_aberto': Decimal('0.00'),
+        'saldo': total_quitado,
     }
 
 
@@ -298,11 +272,20 @@ class DespesaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
         if self.request.user.is_staff:
             serializer.save()
             return
-        serializer.save(republica=self.get_required_user_republica())
+        republica = self.get_required_user_republica()
+        self.ensure_republic_admin(
+            republica,
+            'Somente o administrador da republica pode cadastrar despesas.',
+        )
+        serializer.save(republica=republica)
 
     def _usuario_pode_quitar_despesa(self, despesa, campos_alterados):
         morador = self.get_user_morador()
-        if not morador or morador.republica_id != despesa.republica_id:
+        if (
+            not morador
+            or morador.republica_id != despesa.republica_id
+            or morador.id != despesa.paga_por_id
+        ):
             return False
 
         campos_permitidos = {
@@ -317,17 +300,26 @@ class DespesaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
         despesa = self.get_object()
         self.validate_user_republica(despesa.republica)
         campos_alterados = set(serializer.validated_data.keys())
+        morador_atual = self.get_user_morador()
+        marcando_como_paga = (
+            serializer.validated_data.get('status_pagamento') == Despesa.StatusPagamento.PAGA
+        )
+        quitada_por_informado = 'quitada_por' in serializer.validated_data
+
+        save_kwargs = {}
+        if marcando_como_paga and not quitada_por_informado and morador_atual:
+            save_kwargs['quitada_por'] = morador_atual
 
         if self.user_is_republic_admin(despesa.republica):
-            serializer.save()
+            serializer.save(**save_kwargs)
             return
 
         if not self._usuario_pode_quitar_despesa(despesa, campos_alterados):
             raise PermissionDenied(
-                'Somente o administrador da republica pode editar despesas. Moradores comuns podem apenas concluir o pagamento e anexar o comprovante.'
+                'Somente o administrador da republica pode editar despesas. O morador responsavel pela conta pode apenas registrar o pagamento e anexar o comprovante.'
             )
 
-        serializer.save(republica=despesa.republica, quitada_por=self.get_user_morador())
+        serializer.save(republica=despesa.republica, **save_kwargs)
 
     def perform_destroy(self, instance):
         self.validate_user_republica(instance.republica)
@@ -440,13 +432,12 @@ class RepublicaResumoFinanceiroView(APIView):
         total_despesas = republica.despesas.aggregate(
             total=Coalesce(Sum('valor_total'), Decimal('0.00'))
         )['total']
-        divisoes_republica = list(
-            DivisaoDespesa.objects.select_related('despesa', 'morador')
-            .filter(despesa__republica=republica)
-            .exclude(morador=F('despesa__paga_por'))
-        )
-        total_pendente = sum((divisao.saldo_aberto for divisao in divisoes_republica), Decimal('0.00'))
-        total_quitado = total_despesas - total_pendente
+        total_quitado = republica.despesas.filter(
+            status_pagamento=Despesa.StatusPagamento.PAGA
+        ).aggregate(
+            total=Coalesce(Sum('valor_total'), Decimal('0.00'))
+        )['total']
+        total_pendente = total_despesas - total_quitado
 
         resumo_moradores = [
             construir_resumo_financeiro_morador(morador)
@@ -554,3 +545,9 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UsuarioSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = PerfilUpdateSerializer(instance=request.user, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(UsuarioSerializer(user).data)

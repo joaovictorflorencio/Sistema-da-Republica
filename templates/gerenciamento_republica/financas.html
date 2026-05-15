@@ -12,7 +12,7 @@
     <div class="stat-info">
       <h4>Total em gastos</h4>
       <h2 id="financas-total-gastos">R$ 0,00</h2>
-      <span class="helper-text">Tudo o que já foi lançado na república.</span>
+      <span class="helper-text">Tudo o que ja foi registrado no controle de gastos da republica.</span>
     </div>
   </div>
 
@@ -37,9 +37,9 @@
   <div class="card stat-card financas-summary-card">
     <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
     <div class="stat-info">
-      <h4>Minha participação</h4>
+      <h4>Minhas contas pendentes</h4>
       <h2 id="financas-minha-participacao">R$ 0,00</h2>
-      <span id="financas-meu-status" class="helper-text">Sua parcela acumulada nas contas da casa.</span>
+      <span id="financas-meu-status" class="helper-text">Valor em aberto nas contas atribuidas a voce.</span>
     </div>
   </div>
 </div>
@@ -49,10 +49,13 @@
     <div>
       <h3 class="card-title"><i class="fa-solid fa-receipt"></i> Quadro de gastos da casa</h3>
       <p class="helper-text financas-section-copy">
-        Acompanhe as contas da república, separadas entre pendentes e já quitadas com comprovante.
+        O administrador cadastra a conta e define quem e o morador responsavel pelo pagamento.
+      </p>
+      <p id="financas-toolbar-note" class="helper-text financas-toolbar-note">
+        Somente o admin cria despesas. O morador responsavel registra o pagamento com comprovante.
       </p>
     </div>
-    <button class="btn" data-open-modal="modal-despesa">
+    <button class="btn" id="financas-nova-despesa-btn" data-open-modal="modal-despesa">
       <i class="fa-solid fa-plus"></i> Nova despesa
     </button>
   </div>
@@ -89,21 +92,21 @@
 <div class="grid-2 financas-bottom-grid">
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-file-invoice-dollar"></i> Minhas cotas</h3>
-      <span class="helper-text">Quanto você participa em cada conta da república.</span>
+      <h3 class="card-title"><i class="fa-solid fa-file-invoice-dollar"></i> Minhas contas atribuidas</h3>
+      <span class="helper-text">Contas em que voce foi definido como responsavel pelo pagamento.</span>
     </div>
-    <div id="financas-minhas-cotas-list" class="expense-list">
-      <div class="empty-state">Carregando suas cotas...</div>
+    <div id="financas-minhas-contas-list" class="expense-list">
+      <div class="empty-state">Carregando suas contas...</div>
     </div>
   </div>
 
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Resumo por morador</h3>
-      <span class="helper-text">Visão simples do quanto cada pessoa já acumulou em despesas da casa.</span>
+      <h3 class="card-title"><i class="fa-solid fa-scale-balanced"></i> Resumo por responsavel</h3>
+      <span class="helper-text">Visao simples de quantas contas cada morador tem sob sua responsabilidade.</span>
     </div>
-    <div id="financas-saldos-list" class="financas-saldos-grid">
-      <div class="empty-state">Carregando participações...</div>
+    <div id="financas-responsaveis-list" class="financas-saldos-grid">
+      <div class="empty-state">Carregando responsaveis...</div>
     </div>
   </div>
 </div>
@@ -130,7 +133,7 @@
     <form id="despesa-form">
       <div class="modal-form-body">
         <div class="form-group">
-          <label>Título</label>
+          <label>Titulo</label>
           <input type="text" class="form-control" name="titulo" placeholder="Ex: Conta de luz" required />
         </div>
         <div class="form-row">
@@ -153,7 +156,7 @@
             <select class="form-control" name="categoria" required>
               <option value="ALUGUEL">Moradia</option>
               <option value="ENERGIA">Energia</option>
-              <option value="AGUA">Água</option>
+              <option value="AGUA">Agua</option>
               <option value="INTERNET">Internet</option>
               <option value="MERCADO">Mercado</option>
               <option value="LIMPEZA">Limpeza</option>
@@ -162,18 +165,16 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Descrição</label>
-          <input type="text" class="form-control" name="descricao" placeholder="Observação opcional" />
+          <label>Descricao</label>
+          <input type="text" class="form-control" name="descricao" placeholder="Observacao opcional" />
         </div>
         <div class="form-group">
-          <label>Responsável pelo pagamento</label>
+          <label>Responsavel pelo pagamento</label>
           <select class="form-control" name="paga_por" id="despesa-paga-por" required></select>
         </div>
-        <div class="form-group">
-          <label>Dividir entre</label>
-          <select class="form-control despesas-participantes-select" name="morador_ids" id="despesa-moradores" multiple size="4" required></select>
-        </div>
-        <p class="helper-text financas-modal-note">Use Ctrl para selecionar mais de um morador.</p>
+        <p class="helper-text financas-modal-note">
+          Essa conta ficara vinculada ao morador escolhido acima e aparecera como pendente ate a quitacao.
+        </p>
       </div>
       <div class="modal-actions">
         <button class="btn modal-submit-btn" type="submit">Salvar despesa</button>
@@ -211,7 +212,7 @@
           <input type="file" class="form-control" name="comprovante_pagamento" accept=".pdf,.png,.jpg,.jpeg,.webp" required />
         </div>
         <p class="helper-text financas-modal-note">
-          Esse arquivo vai servir como prova de que a conta foi quitada.
+          Esse arquivo serve como prova da quitacao. Formatos aceitos: PDF, PNG, JPG e WEBP ate 5 MB.
         </p>
       </div>
       <div class="modal-actions">

@@ -67,14 +67,23 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 .tab-item.active { color: var(--primary); border-bottom-color: var(--primary); }
 .expense-item { display: flex; justify-content: space-between; align-items: center; padding: 18px; border: 1px solid var(--border-color); border-radius: var(--radius-md); margin-bottom: 15px; background: #fff; transition: var(--transition); }
 .exp-icon { width: 50px; height: 50px; border-radius: 14px; background: #f0f5ff; color: var(--primary); display: flex; justify-content: center; align-items: center; font-size: 1.4em; }
-.financas-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 25px; margin-bottom: 30px; }
-.financas-summary-card { min-height: 190px; justify-content: center; }
+.financas-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 25px; margin-bottom: 30px; }
+.financas-summary-card { min-height: 190px; justify-content: center; min-width: 0; }
+.financas-summary-card .stat-icon { width: 58px; height: 58px; font-size: 1.7em; }
 .financas-summary-card .stat-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.financas-summary-card .stat-info h2 { line-height: 1.08; }
+.financas-summary-card .stat-info h2 {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1.02;
+  letter-spacing: -1.2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+}
 .financas-summary-card .helper-text { display: block; line-height: 1.5; max-width: 26ch; }
 .financas-hero-card { background: linear-gradient(135deg, #ffffff, #eef4ff); border-color: rgba(0, 86, 254, 0.12); }
 .financas-board-toolbar { flex-wrap: wrap; gap: 15px; }
 .financas-section-copy { margin-top: 8px; max-width: 680px; line-height: 1.6; }
+.financas-toolbar-note { margin-top: 8px; display: inline-flex; align-items: center; gap: 8px; }
 .financas-bottom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .financas-saldos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
 .saldo-card { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04); }
@@ -92,6 +101,7 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 .financas-card { background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05); }
 .financas-card-pendente { border-left: 5px solid var(--warning); }
 .financas-card-paga { border-left: 5px solid var(--success); }
+.financas-card-vencida { border-left-color: var(--danger); box-shadow: 0 10px 24px rgba(255, 63, 52, 0.12); background: linear-gradient(180deg, #ffffff 0%, #fff8f7 100%); }
 .financas-card-top { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 14px; }
 .financas-card-top > div { flex: 1; min-width: 0; }
 .financas-card-top > strong { font-size: 1.75rem; line-height: 1.05; white-space: nowrap; flex-shrink: 0; }
@@ -101,14 +111,36 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 .financas-card-metadata span { display: flex; gap: 8px; align-items: flex-start; line-height: 1.45; min-width: 0; }
 .financas-card-metadata i { color: #94a3b8; margin-top: 2px; }
 .financas-card-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.financas-tips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-.fin-tip { border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; background: #f8fafc; }
-.fin-tip strong { display: block; margin-bottom: 8px; }
-.fin-tip span { color: var(--text-muted); line-height: 1.5; display: block; }
+.status-vencida { background: #ffefef; color: var(--danger); }
 .expense-item-main { display: flex; align-items: flex-start; gap: 15px; min-width: 0; flex: 1; }
 .expense-item-details { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .expense-item-details strong { line-height: 1.4; overflow-wrap: anywhere; }
 .expense-item > strong { flex-shrink: 0; }
+
+/* PERFIL */
+.profile-layout { display: grid; grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); gap: 25px; }
+.profile-summary-card, .profile-form-card { min-height: 100%; }
+.profile-summary-head { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+.profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, var(--primary), var(--info));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 800;
+  box-shadow: 0 12px 25px rgba(0, 86, 254, 0.25);
+  flex-shrink: 0;
+}
+.profile-summary-text h3 { font-size: 1.5rem; margin-bottom: 6px; }
+.profile-meta-list { display: flex; flex-direction: column; gap: 16px; }
+.profile-meta-item { padding: 16px 18px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: #f8fafc; }
+.profile-meta-item strong { display: block; margin-top: 6px; line-height: 1.5; overflow-wrap: anywhere; }
+.profile-form-note { margin-top: -4px; line-height: 1.6; }
+.profile-actions { padding-top: 18px; margin-top: 18px; }
 
 /* KANBAN */
 .kanban-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 15px; align-items: start; }
@@ -221,7 +253,8 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 
 @media (max-width: 768px) {
   .financas-summary-grid,
-  .financas-bottom-grid {
+  .financas-bottom-grid,
+  .profile-layout {
     grid-template-columns: 1fr;
   }
 

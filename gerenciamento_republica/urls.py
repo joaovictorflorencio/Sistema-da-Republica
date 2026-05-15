@@ -18,6 +18,7 @@ from .views import (
     dashboard_page,
     financas_page,
     login_page,
+    perfil_page,
     tarefas_page,
 )
 
@@ -38,6 +39,7 @@ urlpatterns = [
     path('painel/', dashboard_page, name='painel-page'),
     path('financas/', financas_page, name='financas-page'),
     path('tarefas/', tarefas_page, name='tarefas-page'),
+    path('perfil/', perfil_page, name='perfil-page'),
     path('api/auth/cadastro/', CadastroUsuarioView.as_view(), name='cadastro'),
     path('api/auth/login/', LoginView.as_view(), name='login'),
     path('api/auth/logout/', LogoutView.as_view(), name='logout'),

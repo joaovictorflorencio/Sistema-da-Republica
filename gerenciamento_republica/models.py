@@ -277,9 +277,12 @@ class Pagamento(models.Model):
         if (
             self.referencia_despesa_id
             and self.recebedor_id
-            and self.referencia_despesa.paga_por_id != self.recebedor_id
+            and self.referencia_despesa.quitada_por_id != self.recebedor_id
         ):
             errors['recebedor'] = 'O recebedor precisa ser quem pagou a despesa de referencia.'
+
+        if self.referencia_despesa_id and self.referencia_despesa.status_pagamento != Despesa.StatusPagamento.PAGA:
+            errors['referencia_despesa'] = 'A despesa de referencia precisa estar marcada como paga.'
 
         if errors:
             raise ValidationError(errors)

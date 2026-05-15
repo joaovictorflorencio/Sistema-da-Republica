@@ -4,14 +4,14 @@
     const saldo = getMeuSaldo();
     const adminMorador = state.currentMoradores.find((morador) => morador.eh_admin);
 
-    document.getElementById("dashboard-user-saldo").textContent = formatMoney(saldo ? saldo.saldo : 0);
+    document.getElementById("dashboard-user-saldo").textContent = formatMoney(saldo ? saldo.total_pendente : 0);
     const badge = document.getElementById("dashboard-saldo-badge");
-    if (saldo && Number(saldo.saldo) >= 0) {
-      badge.className = "badge badge-success";
-      badge.textContent = "A receber";
+    if (saldo && Number(saldo.total_pendente) > 0) {
+      badge.className = "badge badge-warning";
+      badge.textContent = "Sob sua responsabilidade";
     } else {
-      badge.className = "badge badge-danger";
-      badge.textContent = "A pagar";
+      badge.className = "badge badge-success";
+      badge.textContent = "Tudo em dia";
     }
 
     document.getElementById("dashboard-total-casa").textContent = formatMoney(state.currentOverview.total_despesas);
@@ -40,9 +40,9 @@
         div.innerHTML = `
           <div>
             <strong style="display:block;">${morador.nome}</strong>
-            <span class="helper-text">Devido: ${formatMoney(morador.total_devido)} - Pago: ${formatMoney(morador.total_pago_em_despesas)}</span>
+            <span class="helper-text">Atribuído: ${formatMoney(morador.total_devido)} - Pago: ${formatMoney(morador.total_quitado)}</span>
           </div>
-          <span class="badge ${Number(morador.saldo) >= 0 ? "badge-success" : "badge-danger"}">${formatMoney(morador.saldo)}</span>
+          <span class="badge ${Number(morador.total_pendente) > 0 ? "badge-warning" : "badge-success"}">${formatMoney(morador.total_pendente)}</span>
         `;
         return div;
       },
@@ -58,7 +58,7 @@
         div.innerHTML = `
           <div>
             <strong style="display:block;">${despesa.titulo}</strong>
-            <span class="helper-text">${despesa.categoria} - pago por ${despesa.paga_por_nome}</span>
+            <span class="helper-text">${despesa.categoria} - responsável: ${despesa.paga_por_nome}</span>
           </div>
           <strong>${formatMoney(despesa.valor_total)}</strong>
         `;

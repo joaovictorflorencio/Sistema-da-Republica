@@ -55,6 +55,9 @@
         <a class="nav-btn {% if page_key == 'tarefas' %}active{% endif %}" href="{% url 'gerenciamento_republica:tarefas-page' %}">
           <i class="fa-solid fa-broom"></i> <span>Tarefas</span>
         </a>
+        <a class="nav-btn {% if page_key == 'perfil' %}active{% endif %}" href="{% url 'gerenciamento_republica:perfil-page' %}">
+          <i class="fa-solid fa-user-gear"></i> <span>Perfil</span>
+        </a>
       </nav>
     </aside>
 
@@ -94,6 +97,7 @@
           painel: "{% url 'gerenciamento_republica:painel-page' %}",
           financas: "{% url 'gerenciamento_republica:financas-page' %}",
           tarefas: "{% url 'gerenciamento_republica:tarefas-page' %}",
+          perfil: "{% url 'gerenciamento_republica:perfil-page' %}",
           authLogin: "{% url 'gerenciamento_republica:login' %}",
           authLogout: "{% url 'gerenciamento_republica:logout' %}",
           authMe: "{% url 'gerenciamento_republica:me' %}",

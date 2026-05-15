@@ -139,6 +139,11 @@
       : "Sem vinculo";
   }
 
+  function setCurrentUser(user) {
+    state.currentUser = user;
+    applyUserUI();
+  }
+
   function getMeuSaldo() {
     if (!state.currentUser || !state.currentResumo || !state.currentUser.morador_id) return null;
     return state.currentResumo.moradores.find((item) => item.id === state.currentUser.morador_id) || null;
@@ -226,6 +231,7 @@
         openModal,
         closeModal,
         reloadFinancialSources,
+        setCurrentUser,
       });
     } catch (error) {
       if (error && error.message === "Usuario sem republica") {
@@ -252,6 +258,7 @@
     formatDateTime,
     getMeuSaldo,
     getSaldoDescriptor,
+    setCurrentUser,
     openModal,
     closeModal,
     reloadFinancialSources,

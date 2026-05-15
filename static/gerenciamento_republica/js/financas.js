@@ -2,12 +2,15 @@
   const CATEGORY_LABELS = {
     ALUGUEL: "Moradia",
     ENERGIA: "Energia",
-    AGUA: "Água",
+    AGUA: "Agua",
     INTERNET: "Internet",
     MERCADO: "Mercado",
     LIMPEZA: "Limpeza",
     OUTROS: "Outros",
   };
+
+  const ALLOWED_PROOF_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg", ".webp"];
+  const MAX_PROOF_SIZE = 5 * 1024 * 1024;
 
   function getErrorMessage(data, fallbackMessage) {
     if (!data || typeof data !== "object") return fallbackMessage;
@@ -34,6 +37,14 @@
     return expense.status_pagamento === "PAGA";
   }
 
+  function getTodayISO() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function isOverdue(expense) {
+    return !isPaid(expense) && Boolean(expense.data_vencimento) && expense.data_vencimento < getTodayISO();
+  }
+
   function formatCategoryLabel(category) {
     return CATEGORY_LABELS[category] || category || "Outros";
   }
@@ -54,25 +65,52 @@
   }
 
   function canConfirmPayment(state, expense) {
-    return Boolean(state.currentUser.morador_id) || state.currentUser.morador_eh_admin;
+    return (
+      state.currentUser.is_staff ||
+      state.currentUser.morador_eh_admin ||
+      Number(state.currentUser.morador_id) === Number(expense.paga_por)
+    );
+  }
+
+  function validateProofFile(file) {
+    if (!file) {
+      return "Selecione um comprovante para registrar o pagamento.";
+    }
+
+    const lowerName = String(file.name || "").toLowerCase();
+    const hasAllowedExtension = ALLOWED_PROOF_EXTENSIONS.some((extension) => lowerName.endsWith(extension));
+    if (!hasAllowedExtension) {
+      return "Use um comprovante em PDF, PNG, JPG ou WEBP.";
+    }
+
+    if (file.size > MAX_PROOF_SIZE) {
+      return "O comprovante precisa ter no maximo 5 MB.";
+    }
+
+    return null;
   }
 
   function buildExpenseCard(ctx, expense, variant) {
     const { state, formatMoney, formatDate, openModal } = ctx;
     const card = document.createElement("article");
     card.className = `financas-card financas-card-${variant}`;
+    if (isOverdue(expense)) {
+      card.classList.add("financas-card-vencida");
+    }
 
+    const overdue = isOverdue(expense);
     const vencimento = expense.data_vencimento
-      ? `Vence em ${formatDate(expense.data_vencimento)}`
+      ? `${overdue ? "Venceu em" : "Vence em"} ${formatDate(expense.data_vencimento)}`
       : "Sem vencimento informado";
-    const descricao = expense.descricao || "Sem observações adicionais.";
+    const descricao = expense.descricao || "Sem observacoes adicionais.";
     const categoria = formatCategoryLabel(expense.categoria);
     const pagamentoInfo = isPaid(expense)
       ? `Pago por ${expense.quitada_por_nome || expense.paga_por_nome}`
-      : `Responsável: ${expense.paga_por_nome}`;
+      : `Responsavel cadastrado: ${expense.paga_por_nome}`;
     const dataStatus = isPaid(expense)
       ? `Quitada em ${formatDate(expense.data_pagamento)}`
       : vencimento;
+    const cadastroInfo = `Lancada em ${formatDate(expense.data_despesa)}`;
 
     card.innerHTML = `
       <div class="financas-card-top">
@@ -80,6 +118,7 @@
           <span class="status-chip ${isPaid(expense) ? "status-concluida" : "status-pendente"}">
             ${isPaid(expense) ? "Pago" : "Pendente"}
           </span>
+          ${overdue ? '<span class="status-chip status-vencida">Vencida</span>' : ""}
           <h4>${expense.titulo}</h4>
         </div>
         <strong>${formatMoney(expense.valor_total)}</strong>
@@ -89,7 +128,7 @@
           <span><i class="fa-solid fa-tag"></i> ${categoria}</span>
           <span><i class="fa-solid fa-calendar-days"></i> ${dataStatus}</span>
           <span><i class="fa-solid fa-user"></i> ${pagamentoInfo}</span>
-          <span><i class="fa-solid fa-users"></i> ${expense.participantes_count} ${pluralize(expense.participantes_count, "participante", "participantes")}</span>
+          <span><i class="fa-solid fa-clock"></i> ${cadastroInfo}</span>
       </div>
     `;
 
@@ -128,22 +167,10 @@
   }
 
   async function renderFinancas(ctx) {
-    const {
-      state,
-      apiFetch,
-      renderList,
-      fillSelect,
-      formatMoney,
-      formatDate,
-    } = ctx;
+    const { state, apiFetch, renderList, fillSelect, formatMoney, formatDate } = ctx;
 
-    const [despesasResponse, divisoesResponse] = await Promise.all([
-      apiFetch("/api/despesas/"),
-      apiFetch("/api/divisoes/"),
-    ]);
-
+    const despesasResponse = await apiFetch("/api/despesas/");
     const despesas = await despesasResponse.json();
-    const divisoes = await divisoesResponse.json();
 
     const pendentes = despesas
       .filter((expense) => !isPaid(expense))
@@ -151,38 +178,60 @@
     const pagas = despesas
       .filter((expense) => isPaid(expense))
       .sort((a, b) => compareByDate(a, b, "data_pagamento", "desc"));
-    const minhasCotas = divisoes
-      .filter(
-      (divisao) => Number(divisao.morador) === Number(state.currentUser.morador_id)
-      )
-      .sort((a, b) => compareByDate(a, b, "despesa_data", "desc"));
+    const minhasContas = despesas
+      .filter((expense) => Number(expense.paga_por) === Number(state.currentUser.morador_id))
+      .sort((a, b) => compareByDate(a, b, "data_vencimento", "asc"));
+    const minhasPendentes = minhasContas.filter((expense) => !isPaid(expense));
+
+    const resumoResponsaveis = state.currentMoradores.map((morador) => {
+      const contas = despesas.filter((expense) => Number(expense.paga_por) === Number(morador.id));
+      const contasPendentes = contas.filter((expense) => !isPaid(expense));
+      const contasPagas = contas.filter((expense) => isPaid(expense));
+      return {
+        id: morador.id,
+        nome: morador.nome,
+        totalContas: contas.length,
+        valorTotal: contas.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0),
+        valorPendente: contasPendentes.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0),
+        contasPendentes: contasPendentes.length,
+        contasPagas: contasPagas.length,
+      };
+    });
 
     const totalGastos = despesas.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0);
     const valorPendente = pendentes.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0);
     const valorPago = pagas.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0);
-    const minhaParticipacao = minhasCotas.reduce(
-      (acc, divisao) => acc + toNumber(divisao.valor_devido),
-      0
-    );
+    const meuValorPendente = minhasPendentes.reduce((acc, expense) => acc + toNumber(expense.valor_total), 0);
 
     document.getElementById("financas-total-gastos").textContent = formatMoney(totalGastos);
     document.getElementById("financas-total-pendentes").textContent = String(pendentes.length);
     document.getElementById("financas-total-pagas").textContent = String(pagas.length);
-    document.getElementById("financas-minha-participacao").textContent = formatMoney(minhaParticipacao);
+    document.getElementById("financas-minha-participacao").textContent = formatMoney(meuValorPendente);
     document.getElementById("financas-valor-pendente").textContent = `${formatMoney(valorPendente)} em aberto`;
     document.getElementById("financas-valor-pago").textContent = `${formatMoney(valorPago)} comprovados`;
     document.getElementById("financas-meu-status").textContent =
-      minhasCotas.length > 0
-        ? `${minhasCotas.length} ${pluralize(minhasCotas.length, "conta entra", "contas entram")} na sua parcela atual.`
-        : "Você ainda não participa de contas cadastradas.";
+      minhasContas.length > 0
+        ? `${minhasPendentes.length} ${pluralize(minhasPendentes.length, "conta pendente", "contas pendentes")} atribuidas a voce.`
+        : "Voce ainda nao tem contas atribuidas.";
     document.getElementById("financas-pendentes-resumo").textContent =
       pendentes.length > 0
         ? `${pendentes.length} ${pluralize(pendentes.length, "conta aguardando pagamento", "contas aguardando pagamento")}`
         : "Nenhuma conta em aberto no momento.";
     document.getElementById("financas-pagas-resumo").textContent =
       pagas.length > 0
-        ? `${pagas.length} ${pluralize(pagas.length, "conta já foi quitada", "contas já foram quitadas")}`
+        ? `${pagas.length} ${pluralize(pagas.length, "conta ja foi quitada", "contas ja foram quitadas")}`
         : "Sem contas pagas ainda.";
+
+    const toolbarNote = document.getElementById("financas-toolbar-note");
+    if (toolbarNote) {
+      if (state.currentUser.is_staff || state.currentUser.morador_eh_admin) {
+        toolbarNote.textContent =
+          "Voce pode cadastrar novas despesas, escolher o responsavel e acompanhar o status de cada conta.";
+      } else {
+        toolbarNote.textContent =
+          "Apenas o admin cadastra despesas. Voce pode registrar pagamento somente das contas atribuidas a voce.";
+      }
+    }
 
     renderList(
       "financas-pendentes-list",
@@ -199,56 +248,54 @@
     );
 
     renderList(
-      "financas-minhas-cotas-list",
-      minhasCotas,
-      (divisao) => {
+      "financas-minhas-contas-list",
+      minhasContas,
+      (expense) => {
         const item = document.createElement("div");
         item.className = "expense-item";
         item.innerHTML = `
           <div class="expense-item-main">
             <div class="exp-icon"><i class="fa-solid fa-receipt"></i></div>
             <div class="expense-item-details">
-              <strong style="display:block;">${divisao.despesa_titulo}</strong>
-              <span class="helper-text">${formatDate(divisao.despesa_data)} • ${formatCategoryLabel(divisao.despesa_categoria)}</span>
-              <span class="helper-text">Lançada por: ${divisao.credor_nome}</span>
+              <strong style="display:block;">${expense.titulo}</strong>
+              <span class="helper-text">${formatDate(expense.data_despesa)} - ${formatCategoryLabel(expense.categoria)}</span>
+              <span class="helper-text">${isPaid(expense) ? "Conta ja paga" : "Aguardando pagamento"}</span>
             </div>
           </div>
-          <strong>${formatMoney(divisao.valor_devido)}</strong>
+          <strong>${formatMoney(expense.valor_total)}</strong>
         `;
         return item;
       },
-      "Você ainda não participa de nenhuma despesa cadastrada."
+      "Voce ainda nao tem despesas sob sua responsabilidade."
     );
 
     renderList(
-      "financas-saldos-list",
-      [...state.currentResumo.moradores].sort(
-        (a, b) => toNumber(b.total_devido) - toNumber(a.total_devido)
-      ),
+      "financas-responsaveis-list",
+      resumoResponsaveis.sort((a, b) => b.valorPendente - a.valorPendente),
       (morador) => {
         const card = document.createElement("div");
-        const destaque = Number(morador.id) === Number(state.currentUser.morador_id) ? " (você)" : "";
+        const destaque = Number(morador.id) === Number(state.currentUser.morador_id) ? " (voce)" : "";
         card.className = "saldo-card";
         card.innerHTML = `
           <div class="saldo-card-top">
             <div>
               <strong style="display:block;">${morador.nome}${destaque}</strong>
-              <span class="helper-text">Participação acumulada nos gastos</span>
+              <span class="helper-text">${morador.totalContas} ${pluralize(morador.totalContas, "conta atribuida", "contas atribuidas")}</span>
             </div>
-            <span class="badge badge-warning">Cota ${formatMoney(morador.total_devido)}</span>
+            <span class="badge badge-warning">${formatMoney(morador.valorTotal)}</span>
           </div>
           <div class="saldo-card-metrics">
             <div>
-              <span class="helper-text">Quitado</span>
-              <strong>${formatMoney(morador.total_quitado)}</strong>
+              <span class="helper-text">Pagas</span>
+              <strong>${morador.contasPagas}</strong>
             </div>
             <div>
-              <span class="helper-text">Pendente</span>
-              <strong>${formatMoney(morador.total_pendente)}</strong>
+              <span class="helper-text">Pendentes</span>
+              <strong>${morador.contasPendentes}</strong>
             </div>
             <div>
-              <span class="helper-text">Saldo estimado</span>
-              <strong>${formatMoney(morador.saldo)}</strong>
+              <span class="helper-text">Valor em aberto</span>
+              <strong>${formatMoney(morador.valorPendente)}</strong>
             </div>
           </div>
         `;
@@ -258,10 +305,13 @@
     );
 
     fillSelect(document.getElementById("despesa-paga-por"), false);
-    fillSelect(document.getElementById("despesa-moradores"), false);
-    Array.from(document.getElementById("despesa-moradores").options).forEach((option) => {
-      option.selected = true;
-    });
+    const botaoNovaDespesa = document.getElementById("financas-nova-despesa-btn");
+    if (botaoNovaDespesa) {
+      botaoNovaDespesa.classList.toggle(
+        "hidden",
+        !(state.currentUser.is_staff || state.currentUser.morador_eh_admin)
+      );
+    }
   }
 
   async function submitDespesa(ctx, event) {
@@ -278,9 +328,6 @@
       paga_por: Number(form.paga_por.value),
       data_vencimento: form.data_vencimento.value || null,
       data_despesa: form.data_despesa.value,
-      morador_ids: Array.from(document.getElementById("despesa-moradores").selectedOptions).map(
-        (option) => Number(option.value)
-      ),
     };
 
     const response = await apiFetch("/api/despesas/", {
@@ -290,7 +337,7 @@
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      showToast(getErrorMessage(data, "Não foi possível salvar a despesa."), "danger");
+      showToast(getErrorMessage(data, "Nao foi possivel salvar a despesa."), "danger");
       return;
     }
 
@@ -307,13 +354,17 @@
     const form = event.currentTarget;
     const despesaId = document.getElementById("comprovante-despesa-id").value;
     const comprovante = form.comprovante_pagamento.files[0];
+    const validationMessage = validateProofFile(comprovante);
+
+    if (validationMessage) {
+      showToast(validationMessage, "danger");
+      return;
+    }
 
     const payload = new FormData();
     payload.append("status_pagamento", "PAGA");
     payload.append("data_pagamento", form.data_pagamento.value);
-    if (comprovante) {
-      payload.append("comprovante_pagamento", comprovante);
-    }
+    payload.append("comprovante_pagamento", comprovante);
 
     const response = await apiFetch(`/api/despesas/${despesaId}/`, {
       method: "PATCH",
@@ -322,7 +373,7 @@
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      showToast(getErrorMessage(data, "Não foi possível registrar o pagamento."), "danger");
+      showToast(getErrorMessage(data, "Nao foi possivel registrar o pagamento."), "danger");
       return;
     }
 

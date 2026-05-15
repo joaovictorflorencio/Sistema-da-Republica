@@ -1,40 +1,62 @@
-# Sistema de Republica
+# RABBU - Sistema de Gestao de Republicas
 
-Este projeto e um MVP em Django pensado para ajudar no dia a dia de moradias compartilhadas. A proposta e centralizar o que normalmente gera mais atrito em uma republica: despesas da casa, organizacao de tarefas e uma visao geral da rotina.
+O RABBU e um projeto em Django feito para organizar a rotina de uma republica de forma simples e clara. A ideia central do sistema e juntar, em um unico lugar, o que mais costuma gerar atrito no dia a dia: contas da casa, tarefas e visao geral da rotina.
 
-Hoje o sistema ja permite:
+Hoje o sistema esta focado em um MVP funcional, com fluxo web completo e uma API REST para apoiar autenticacao, moradores, despesas e tarefas.
+
+## O que o sistema faz hoje
+
 - cadastro e login pela web
-- criacao de uma nova republica durante o cadastro
-- acesso a um dashboard com resumo da casa
-- lancamento de despesas
-- gerenciamento de tarefas
-- API REST para republicas, moradores, despesas, pagamentos e tarefas
+- criacao de uma nova republica no proprio cadastro
+- entrada em uma republica existente por ID
+- dashboard com resumo da casa
+- controle de gastos em formato de quadro
+- cadastro de despesas apenas pelo admin da republica
+- atribuicao de cada despesa a um morador responsavel pelo pagamento
+- registro do pagamento com comprovante
+- destaque visual para contas vencidas e ainda pendentes
+- quadro de tarefas com historico de concluidas
+- isolamento de dados por republica
 
-## Objetivo
+## Como funciona a tela de financas
 
-Entregar uma base funcional para organizacao de uma republica, permitindo:
-- acompanhar despesas da casa
-- dividir contas entre moradores
-- organizar tarefas domesticas
-- controlar acesso por usuario e por republica
+No fluxo atual, a area de financas funciona como um controle de gastos da casa.
 
-## Publico-alvo
+Regra principal:
 
-Estudantes e pessoas que moram em republicas ou em outros tipos de moradia compartilhada.
+1. o admin da republica cadastra a despesa
+2. o admin escolhe qual morador fica responsavel por pagar aquela conta
+3. a despesa aparece em `Contas pendentes`
+4. quando o morador responsavel quita a conta, ele registra o pagamento e anexa o comprovante
+5. a conta sai de `Pendentes` e vai para `Pagas`
+
+Ou seja: a versao atual nao tenta fazer rateio complexo entre moradores no fluxo web principal. Ela foi simplificada para ficar mais coerente com o escopo academico do projeto.
+
+## Cadastro de republica com CEP
+
+Ao criar uma nova republica pela tela de cadastro, o usuario pode:
+
+- informar o CEP
+- preencher o endereco automaticamente
+- ajustar numero e complemento
+- abrir o local no Google Maps para conferencia
+
+O endereco final continua sendo salvo em um unico campo de texto no backend.
 
 ## Como rodar o projeto
 
 ### Jeito mais simples no Windows
 
-Se voce estiver no Windows, basta abrir a pasta do projeto e executar:
+Abra a pasta do projeto e execute:
 
 `iniciar_rabbu.bat`
 
-Esse arquivo faz automaticamente:
-- cria o ambiente virtual, se ainda nao existir
+Esse arquivo:
+
+- cria a `.venv`, se precisar
 - instala as dependencias
 - aplica as migracoes
-- carrega os dados de demonstracao
+- roda o `seed_demo`
 - abre o navegador
 - inicia o servidor
 
@@ -44,22 +66,15 @@ Depois disso, o sistema abre em:
 
 ### Jeito manual
 
-Se voce acabou de baixar o projeto, estes comandos ja deixam tudo pronto:
-
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.txt
 .\.venv\Scripts\python manage.py migrate
+.\.venv\Scripts\python manage.py seed_demo
 .\.venv\Scripts\python manage.py runserver
 ```
 
-Depois disso, abra:
-
-`http://127.0.0.1:8000/`
-
-## Como navegar
-
-As telas principais do sistema sao estas:
+## Rotas principais da interface
 
 - `http://127.0.0.1:8000/login/`
 - `http://127.0.0.1:8000/cadastro/`
@@ -67,30 +82,63 @@ As telas principais do sistema sao estas:
 - `http://127.0.0.1:8000/financas/`
 - `http://127.0.0.1:8000/tarefas/`
 
-O fluxo mais natural do MVP e:
+## Fluxo recomendado para demonstracao
 
 1. criar uma conta em `/cadastro/`
-2. entrar em uma republica existente ou criar uma nova
-3. acessar o painel
-4. lancar despesas da casa
-5. organizar as tarefas da rotina
+2. criar uma nova republica
+3. entrar no painel
+4. ir para `Financas`
+5. cadastrar uma despesa como admin
+6. registrar o pagamento da conta com comprovante
+7. conferir a conta em `Pagas`
+8. criar e concluir uma tarefa
 
 ## Dados de demonstracao
 
-Se voce quiser ver o sistema com dados de exemplo, pode popular o banco com:
+O comando `seed_demo` cria uma republica pronta para testes:
 
-```powershell
-.\.venv\Scripts\python manage.py seed_demo
-```
+- republica: `Republica Teste`
+- id da republica: `1`
 
-Usuarios criados:
+Usuarios de exemplo:
 
-- `testeuser@example.com` / `Teste12345`
-- `shinrateus@gmail.com` / `Teste12345`
+- username: `testeuser`
+  email: `testeuser@example.com`
+  senha: `Teste12345`
+  papel: admin da republica
 
-## Area administrativa
+- username: `teuszx`
+  email: `shinrateus@gmail.com`
+  senha: `Teste12345`
+  papel: morador comum
 
-Se quiser acessar o admin do Django, crie um superusuario:
+## API principal
+
+Autenticacao:
+
+- `POST /api/auth/cadastro/`
+- `POST /api/auth/login/`
+- `POST /api/auth/logout/`
+- `GET /api/auth/me/`
+
+Recursos:
+
+- `GET/POST /api/republicas/`
+- `GET/POST /api/moradores/`
+- `GET/POST /api/despesas/`
+- `GET/POST /api/tarefas/`
+- `GET /api/dashboard/overview/`
+- `GET /api/republicas/<id>/resumo-financeiro/`
+
+Observacao:
+
+- a interface principal do sistema hoje usa o fluxo de `despesas` e `comprovantes`
+- algumas rotas antigas de financas continuam no backend para suporte interno e testes
+- no uso normal pela interface web, voce nao precisa se preocupar com elas
+
+## Area administrativa do Django
+
+Se quiser acessar o admin:
 
 ```powershell
 .\.venv\Scripts\python manage.py createsuperuser
@@ -100,91 +148,13 @@ Depois abra:
 
 `http://127.0.0.1:8000/admin/`
 
-## API e autenticacao
+## Como rodar os testes
 
-O projeto tambem possui API REST. O cadastro fica em:
-
-`POST /api/auth/cadastro/`
-
-Exemplo para entrar em uma republica existente:
-
-```json
-{
-  "username": "lucas",
-  "email": "lucas@example.com",
-  "password": "SenhaForte123",
-  "password_confirm": "SenhaForte123",
-  "nome": "Lucas",
-  "republica": 1
-}
+```powershell
+.\.venv\Scripts\python manage.py test gerenciamento_republica
 ```
 
-Exemplo para criar uma nova republica no mesmo fluxo:
 
-```json
-{
-  "username": "lucas",
-  "email": "lucas@example.com",
-  "password": "SenhaForte123",
-  "password_confirm": "SenhaForte123",
-  "nome": "Lucas",
-  "nova_republica_nome": "Solar 101",
-  "nova_republica_endereco": "Rua A, 10"
-}
-```
-
-O login fica em:
-
-`POST /api/auth/login/`
-
-```json
-{
-  "email": "lucas@example.com",
-  "password": "SenhaForte123"
-}
-```
-
-Com o token retornado, use:
-
-```text
-Authorization: Token SEU_TOKEN
-```
-
-Tambem existem:
-
-- `GET /api/auth/me/`
-- `POST /api/auth/logout/`
-
-## Endpoints principais
-
-Os endpoints principais da API hoje sao:
-
-- `GET/POST /api/republicas/`
-- `GET/POST /api/moradores/`
-- `GET/POST /api/despesas/`
-- `GET /api/divisoes/`
-- `GET/POST /api/pagamentos/`
-- `GET/POST /api/tarefas/`
-- `GET /api/republicas/<id>/resumo-financeiro/`
-- `GET /api/dashboard/overview/`
-
-## O que este MVP ja entrega
-
-O sistema ja tem uma base boa para demonstracao:
-
-- usuarios comuns so enxergam dados da propria republica
-- despesas sao divididas automaticamente entre os moradores informados
-- o criador de uma republica passa a ser vinculado como primeiro morador
-- o dashboard mostra uma visao geral da casa
-- os testes cobrem a jornada principal do projeto
-
-## O que ainda pode evoluir
-
-Alguns pontos ficaram como proxima etapa:
-
-- refinar toda a logica de pagamentos
-- trocar a entrada em republica por ID por algo mais amigavel, como codigo ou lista
-- dar mais polimento visual e de experiencia
 
 ## Equipe
 
@@ -195,14 +165,3 @@ Alguns pontos ficaram como proxima etapa:
 - Erick Alves de Souza - 01613377
 - Patrick Jose Viana Costa - 01594218
 - Lucas Enthony Gomes Ferreira - 01576401
-
-## Status
-
-Em desenvolvimento.
-## Como rodar os testes
-
-```powershell
-.\.venv\Scripts\python manage.py test gerenciamento_republica
-```
-
-

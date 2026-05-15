@@ -119,16 +119,130 @@
             </div>
 
             <div class="form-group">
-              <label>Endereco</label>
+              <label>CEP</label>
               <div class="input-wrapper">
                 <i class="fa-solid fa-location-dot icon-left"></i>
                 <input
                   type="text"
-                  id="signup-new-republica-address"
+                  id="signup-new-republica-cep"
                   class="form-control"
-                  placeholder="Rua, numero, bairro"
+                  placeholder="00000-000"
+                  inputmode="numeric"
+                  maxlength="9"
                 />
               </div>
+              <small class="helper-text">Digite o CEP para preencher o endereco automaticamente.</small>
+            </div>
+
+            <div class="inline-actions">
+              <button type="button" class="btn-secondary" id="signup-cep-search-btn">
+                <i class="fa-solid fa-magnifying-glass-location"></i>
+                Buscar CEP
+              </button>
+              <button type="button" class="btn-secondary btn-map" id="signup-open-map-btn">
+                <i class="fa-solid fa-map-location-dot"></i>
+                Ver no mapa
+              </button>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Rua</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-road icon-left"></i>
+                  <input
+                    type="text"
+                    id="signup-new-republica-street"
+                    class="form-control"
+                    placeholder="Rua ou avenida"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Numero</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-hashtag icon-left"></i>
+                  <input
+                    type="text"
+                    id="signup-new-republica-number"
+                    class="form-control"
+                    placeholder="Ex: 120"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Bairro</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-building icon-left"></i>
+                  <input
+                    type="text"
+                    id="signup-new-republica-neighborhood"
+                    class="form-control"
+                    placeholder="Bairro"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Cidade</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-city icon-left"></i>
+                  <input
+                    type="text"
+                    id="signup-new-republica-city"
+                    class="form-control"
+                    placeholder="Cidade"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>UF</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-map-pin icon-left"></i>
+                  <input
+                    type="text"
+                    id="signup-new-republica-state"
+                    class="form-control"
+                    placeholder="UF"
+                    maxlength="2"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Complemento</label>
+                <div class="input-wrapper">
+                  <i class="fa-regular fa-pen-to-square icon-left"></i>
+                  <input
+                    type="text"
+                    id="signup-new-republica-complement"
+                    class="form-control"
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Endereco completo</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-location-crosshairs icon-left"></i>
+                <input
+                  type="text"
+                  id="signup-new-republica-address"
+                  class="form-control"
+                  placeholder="O endereco sera montado aqui"
+                  readonly
+                />
+              </div>
+              <small class="helper-text">Voce ainda pode ajustar os campos acima antes de criar a republica.</small>
             </div>
           </div>
 
@@ -142,6 +256,7 @@
                 class="form-control"
                 placeholder="********"
                 required
+                aria-describedby="signup-password-error"
               />
               <button
                 type="button"
@@ -151,6 +266,7 @@
                 <i class="fa-regular fa-eye" id="signup-eye"></i>
               </button>
             </div>
+            <small class="field-error" id="signup-password-error"></small>
           </div>
 
           <div class="form-group">
@@ -163,6 +279,7 @@
                 class="form-control"
                 placeholder="********"
                 required
+                aria-describedby="signup-password-confirm-error"
               />
               <button
                 type="button"
@@ -172,6 +289,7 @@
                 <i class="fa-regular fa-eye" id="signup-eye-confirm"></i>
               </button>
             </div>
+            <small class="field-error" id="signup-password-confirm-error"></small>
           </div>
 
           <button type="submit" class="btn-main" id="btn-submit-signup">
@@ -190,7 +308,9 @@
         loginUrl: "{% url 'gerenciamento_republica:login' %}",
         signupUrl: "{% url 'gerenciamento_republica:cadastro' %}",
         loginPageUrl: "{% url 'gerenciamento_republica:login-page' %}",
-        redirectUrl: "{% url 'gerenciamento_republica:painel-page' %}"
+        redirectUrl: "{% url 'gerenciamento_republica:painel-page' %}",
+        viaCepBaseUrl: "https://viacep.com.br/ws/",
+        mapsSearchBaseUrl: "https://www.google.com/maps/search/?api=1&query="
       };
     </script>
     <script src="{% static 'gerenciamento_republica/js/auth.js' %}"></script>

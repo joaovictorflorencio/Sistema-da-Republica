@@ -1,4 +1,5 @@
-from decimal import Decimal, ROUND_DOWN
+from pathlib import Path
+from decimal import Decimal
 
 from django.contrib.auth import authenticate, get_user_model, password_validation
 from django.db import transaction
@@ -17,6 +18,14 @@ from .models import (
 )
 
 User = get_user_model()
+ALLOWED_COMPROVANTE_EXTENSIONS = {'.pdf', '.png', '.jpg', '.jpeg', '.webp'}
+ALLOWED_COMPROVANTE_CONTENT_TYPES = {
+    'application/pdf',
+    'image/png',
+    'image/jpeg',
+    'image/webp',
+}
+MAX_COMPROVANTE_SIZE = 5 * 1024 * 1024
 
 
 def _build_instance(serializer, model_class, attrs):
@@ -35,6 +44,28 @@ def _build_instance(serializer, model_class, attrs):
     return instance
 
 
+def _validate_comprovante_file(uploaded_file):
+    if not uploaded_file:
+        return
+
+    extension = Path(uploaded_file.name or '').suffix.lower()
+    if extension not in ALLOWED_COMPROVANTE_EXTENSIONS:
+        raise serializers.ValidationError(
+            {'comprovante_pagamento': 'Use um comprovante em PDF, PNG, JPG ou WEBP.'}
+        )
+
+    content_type = getattr(uploaded_file, 'content_type', None)
+    if content_type and content_type not in ALLOWED_COMPROVANTE_CONTENT_TYPES:
+        raise serializers.ValidationError(
+            {'comprovante_pagamento': 'O tipo do arquivo enviado nao e suportado.'}
+        )
+
+    if getattr(uploaded_file, 'size', 0) > MAX_COMPROVANTE_SIZE:
+        raise serializers.ValidationError(
+            {'comprovante_pagamento': 'O comprovante precisa ter no maximo 5 MB.'}
+        )
+
+
 class RepublicaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Republica
@@ -43,6 +74,7 @@ class RepublicaSerializer(serializers.ModelSerializer):
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    is_staff = serializers.BooleanField(read_only=True)
     morador_id = serializers.IntegerField(source='morador.id', read_only=True)
     morador_nome = serializers.CharField(source='morador.nome', read_only=True)
     morador_eh_admin = serializers.BooleanField(source='morador.eh_admin', read_only=True)
@@ -57,6 +89,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'email',
             'first_name',
             'last_name',
+            'is_staff',
             'morador_id',
             'morador_nome',
             'morador_eh_admin',
@@ -64,6 +97,31 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'republica_nome',
         ]
         read_only_fields = fields
+
+
+class PerfilUpdateSerializer(serializers.Serializer):
+    nome = serializers.CharField(max_length=100)
+
+    def validate_nome(self, value):
+        nome = value.strip()
+        if not nome:
+            raise serializers.ValidationError('Informe um nome valido.')
+        return nome
+
+    def update(self, instance, validated_data):
+        nome = validated_data['nome']
+        instance.first_name = nome
+        instance.save(update_fields=['first_name'])
+
+        morador = getattr(instance, 'morador', None)
+        if morador:
+            morador.nome = nome
+            morador.save(update_fields=['nome'])
+
+        return instance
+
+    def create(self, validated_data):
+        raise NotImplementedError
 
 
 class CadastroUsuarioSerializer(serializers.Serializer):
@@ -250,17 +308,7 @@ class DespesaSerializer(serializers.ModelSerializer):
     divisoes = DivisaoDespesaSerializer(many=True, read_only=True)
     paga_por_nome = serializers.CharField(source='paga_por.nome', read_only=True)
     quitada_por_nome = serializers.CharField(source='quitada_por.nome', read_only=True)
-    participantes_count = serializers.SerializerMethodField()
-    valor_em_aberto = serializers.SerializerMethodField()
-    valor_quitado = serializers.SerializerMethodField()
     comprovante_url = serializers.SerializerMethodField()
-    morador_ids = serializers.ListField(
-        child=serializers.IntegerField(min_value=1),
-        write_only=True,
-        required=False,
-        allow_empty=False,
-        help_text='Lista de moradores que participam da divisao. Se omitida, usa todos os moradores ativos.',
-    )
 
     class Meta:
         model = Despesa
@@ -282,27 +330,9 @@ class DespesaSerializer(serializers.ModelSerializer):
             'comprovante_pagamento',
             'comprovante_url',
             'criada_em',
-            'participantes_count',
-            'valor_em_aberto',
-            'valor_quitado',
-            'morador_ids',
             'divisoes',
         ]
         read_only_fields = ['id', 'criada_em', 'divisoes', 'comprovante_url', 'quitada_por_nome']
-
-    def get_participantes_count(self, obj):
-        return obj.divisoes.count()
-
-    def get_valor_em_aberto(self, obj):
-        total = sum(
-            divisao.saldo_aberto
-            for divisao in obj.divisoes.all()
-            if divisao.morador_id != obj.paga_por_id
-        )
-        return total
-
-    def get_valor_quitado(self, obj):
-        return obj.valor_total - self.get_valor_em_aberto(obj)
 
     def get_comprovante_url(self, obj):
         if not obj.comprovante_pagamento:
@@ -313,7 +343,8 @@ class DespesaSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(url) if request else url
 
     def validate(self, attrs):
-        morador_ids = attrs.pop('morador_ids', None)
+        if attrs.get('comprovante_pagamento') is not None:
+            _validate_comprovante_file(attrs['comprovante_pagamento'])
 
         if (
             'status_pagamento' not in attrs
@@ -351,88 +382,26 @@ class DespesaSerializer(serializers.ModelSerializer):
             attrs['comprovante_pagamento'] = None
             attrs['quitada_por'] = None
 
-        participantes = None
-        republica = instance.republica
-        if morador_ids is not None:
-            participantes = list(Morador.objects.filter(id__in=morador_ids, ativo=True).order_by('id'))
-            if len(participantes) != len(set(morador_ids)):
-                raise serializers.ValidationError(
-                    {'morador_ids': 'Um ou mais moradores informados nao existem ou estao inativos.'}
-                )
-        elif self.instance is None:
-            participantes = list(republica.moradores.filter(ativo=True).order_by('id'))
-
-        if participantes is not None and not participantes:
-            raise serializers.ValidationError(
-                {'morador_ids': 'Informe pelo menos um morador para dividir a despesa.'}
-            )
-
-        if participantes is not None:
-            ids_invalidos = [morador.id for morador in participantes if morador.republica_id != republica.id]
-            if ids_invalidos:
-                raise serializers.ValidationError(
-                    {'morador_ids': 'Todos os moradores da divisao precisam ser da mesma republica.'}
-                )
-
         if self.instance and PagamentoDivisao.objects.filter(divisao__despesa=self.instance).exists():
             campos_sensiveis = {'valor_total', 'paga_por', 'republica'}
-            if morador_ids is not None or (set(attrs.keys()) & campos_sensiveis):
+            if set(attrs.keys()) & campos_sensiveis:
                 raise serializers.ValidationError(
                     {'detail': 'Nao e possivel alterar a estrutura financeira de uma despesa que ja possui pagamentos aplicados.'}
                 )
 
-        if participantes is not None:
-            attrs['morador_ids'] = [morador.id for morador in participantes]
         return attrs
 
     @transaction.atomic
     def create(self, validated_data):
-        morador_ids = validated_data.pop('morador_ids')
-        despesa = Despesa.objects.create(**validated_data)
-        self._criar_divisoes(despesa, morador_ids)
-        return despesa
+        return Despesa.objects.create(**validated_data)
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        morador_ids = validated_data.pop('morador_ids', None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.full_clean()
         instance.save()
-
-        if morador_ids is not None:
-            instance.divisoes.all().delete()
-            self._criar_divisoes(instance, morador_ids)
-
         return instance
-
-    def _criar_divisoes(self, despesa, morador_ids):
-        participantes = list(Morador.objects.filter(id__in=morador_ids).order_by('id'))
-        quantidade = len(participantes)
-        valor_total = despesa.valor_total
-        base = (valor_total / quantidade).quantize(Decimal('0.01'), rounding=ROUND_DOWN)
-        restante = valor_total - (base * quantidade)
-
-        divisoes = []
-        for indice, morador in enumerate(participantes):
-            acrescimo = Decimal('0.01') if Decimal(indice) < (restante * 100) else Decimal('0.00')
-            valor_devido = base + acrescimo
-            valor_pago = valor_devido if morador.id == despesa.paga_por_id else Decimal('0.00')
-            divisoes.append(
-                DivisaoDespesa(
-                    despesa=despesa,
-                    morador=morador,
-                    valor_devido=valor_devido,
-                    valor_pago=valor_pago,
-                    status=(
-                        DivisaoDespesa.Status.QUITADO
-                        if valor_pago == valor_devido
-                        else DivisaoDespesa.Status.PENDENTE
-                    ),
-                )
-            )
-
-        DivisaoDespesa.objects.bulk_create(divisoes)
 
 
 class PagamentoDivisaoSerializer(serializers.ModelSerializer):
@@ -488,11 +457,12 @@ class PagamentoSerializer(serializers.ModelSerializer):
 
     def _obter_divisoes_alvo(self, instance):
         query = (
-            DivisaoDespesa.objects.select_related('despesa', 'morador', 'despesa__paga_por')
+            DivisaoDespesa.objects.select_related('despesa', 'morador', 'despesa__quitada_por')
             .filter(
                 despesa__republica=instance.republica,
+                despesa__status_pagamento=Despesa.StatusPagamento.PAGA,
                 morador=instance.pagador,
-                despesa__paga_por=instance.recebedor,
+                despesa__quitada_por=instance.recebedor,
             )
             .order_by('despesa__data_despesa', 'despesa_id', 'id')
         )
