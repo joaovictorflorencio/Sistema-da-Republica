@@ -75,11 +75,11 @@ class RepublicaSerializer(serializers.ModelSerializer):
 
 class UsuarioSerializer(serializers.ModelSerializer):
     is_staff = serializers.BooleanField(read_only=True)
-    morador_id = serializers.IntegerField(source='morador.id', read_only=True)
-    morador_nome = serializers.CharField(source='morador.nome', read_only=True)
-    morador_eh_admin = serializers.BooleanField(source='morador.eh_admin', read_only=True)
-    republica_id = serializers.IntegerField(source='morador.republica.id', read_only=True)
-    republica_nome = serializers.CharField(source='morador.republica.nome', read_only=True)
+    morador_id = serializers.SerializerMethodField()
+    morador_nome = serializers.SerializerMethodField()
+    morador_eh_admin = serializers.SerializerMethodField()
+    republica_id = serializers.SerializerMethodField()
+    republica_nome = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -97,6 +97,32 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'republica_nome',
         ]
         read_only_fields = fields
+
+    def _get_morador_ativo(self, obj):
+        morador = getattr(obj, 'morador', None)
+        if not morador or not morador.ativo:
+            return None
+        return morador
+
+    def get_morador_id(self, obj):
+        morador = self._get_morador_ativo(obj)
+        return morador.id if morador else None
+
+    def get_morador_nome(self, obj):
+        morador = self._get_morador_ativo(obj)
+        return morador.nome if morador else None
+
+    def get_morador_eh_admin(self, obj):
+        morador = self._get_morador_ativo(obj)
+        return bool(morador and morador.eh_admin)
+
+    def get_republica_id(self, obj):
+        morador = self._get_morador_ativo(obj)
+        return morador.republica_id if morador else None
+
+    def get_republica_nome(self, obj):
+        morador = self._get_morador_ativo(obj)
+        return morador.republica.nome if morador else None
 
 
 class PerfilUpdateSerializer(serializers.Serializer):
@@ -122,6 +148,16 @@ class PerfilUpdateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         raise NotImplementedError
+
+
+class EntrarRepublicaSerializer(serializers.Serializer):
+    republica = serializers.IntegerField()
+
+    def validate_republica(self, value):
+        republica = Republica.objects.filter(pk=value).first()
+        if not republica:
+            raise serializers.ValidationError('Republica nao encontrada. Confira o ID informado.')
+        return republica
 
 
 class CadastroUsuarioSerializer(serializers.Serializer):
@@ -155,6 +191,11 @@ class CadastroUsuarioSerializer(serializers.Serializer):
         republica = attrs.get('republica')
         nova_republica_nome = (attrs.get('nova_republica_nome') or '').strip()
         nova_republica_endereco = (attrs.get('nova_republica_endereco') or '').strip()
+
+        if not republica and not nova_republica_nome and not nova_republica_endereco:
+            raise serializers.ValidationError(
+                {'detail': 'Escolha uma republica existente ou crie uma nova para concluir o cadastro.'}
+            )
 
         if republica and (nova_republica_nome or nova_republica_endereco):
             raise serializers.ValidationError(

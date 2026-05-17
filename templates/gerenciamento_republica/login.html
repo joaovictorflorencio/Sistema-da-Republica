@@ -32,6 +32,7 @@
 
       <div id="view-login" class="form-view active">
         <p class="subtitle">Bem-vindo(a) de volta a sua casa!</p>
+
         <form id="loginForm">
           <div class="form-group">
             <label>E-mail</label>
@@ -66,6 +67,7 @@
               </button>
             </div>
           </div>
+
           <button type="submit" class="btn-main" id="btn-submit-login">
             <span>Entrar</span>
             <i class="fa-solid fa-arrow-right-to-bracket"></i>
@@ -73,8 +75,198 @@
         </form>
         <div class="switch-link">
           Ainda nao tem conta?
-          <a href="{% url 'gerenciamento_republica:cadastro-page' %}">Criar cadastro</a>
+          <a href="{% url 'gerenciamento_republica:cadastro-page' %}">Criar cadastro e escolher republica</a>
         </div>
+      </div>
+
+      <div id="view-login-republic" class="form-view">
+        <p class="subtitle">Sua conta ainda nao esta em uma republica.</p>
+
+        <div class="login-session-card">
+          <div>
+            <span>Conta autenticada</span>
+            <strong id="login-pending-user">Usuario</strong>
+          </div>
+          <button type="button" class="btn-secondary btn-compact" id="login-change-account-btn">
+            Trocar conta
+          </button>
+        </div>
+
+        <form id="loginRepublicForm">
+          <div class="section-title">Republica</div>
+          <p class="login-republic-helper">
+            Escolha uma republica existente ou crie uma nova para continuar.
+          </p>
+
+          <div class="type-toggle" id="login-republic-mode-toggle">
+            <button type="button" class="toggle-btn active" data-login-republic-mode="existing">Entrar em uma existente</button>
+            <button type="button" class="toggle-btn" data-login-republic-mode="new">Criar nova republica</button>
+          </div>
+
+          <div id="login-existing-section" class="dynamic-section active">
+            <div class="form-group">
+              <label>ID da republica</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-house icon-left"></i>
+                <input
+                  type="number"
+                  id="login-republica"
+                  class="form-control"
+                  placeholder="Ex: 1"
+                  min="1"
+                />
+              </div>
+              <small class="helper-text">Para contas que ja existem, mas ainda nao estao vinculadas a uma republica.</small>
+            </div>
+          </div>
+
+          <div id="login-new-section" class="dynamic-section">
+            <div class="form-group">
+              <label>Nome da nova republica</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-house-circle-check icon-left"></i>
+                <input
+                  type="text"
+                  id="login-new-republica-name"
+                  class="form-control"
+                  placeholder="Ex: Solar 101"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>CEP</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-location-dot icon-left"></i>
+                <input
+                  type="text"
+                  id="login-new-republica-cep"
+                  class="form-control"
+                  placeholder="00000-000"
+                  inputmode="numeric"
+                  maxlength="9"
+                />
+              </div>
+              <small class="helper-text">Digite o CEP para preencher o endereco automaticamente.</small>
+            </div>
+
+            <div class="inline-actions">
+              <button type="button" class="btn-secondary" id="login-cep-search-btn">
+                <i class="fa-solid fa-magnifying-glass-location"></i>
+                Buscar CEP
+              </button>
+              <button type="button" class="btn-secondary btn-map" id="login-open-map-btn">
+                <i class="fa-solid fa-map-location-dot"></i>
+                Ver no mapa
+              </button>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Rua</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-road icon-left"></i>
+                  <input
+                    type="text"
+                    id="login-new-republica-street"
+                    class="form-control"
+                    placeholder="Rua ou avenida"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Numero</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-hashtag icon-left"></i>
+                  <input
+                    type="text"
+                    id="login-new-republica-number"
+                    class="form-control"
+                    placeholder="Ex: 120"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Bairro</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-building icon-left"></i>
+                  <input
+                    type="text"
+                    id="login-new-republica-neighborhood"
+                    class="form-control"
+                    placeholder="Bairro"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Cidade</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-city icon-left"></i>
+                  <input
+                    type="text"
+                    id="login-new-republica-city"
+                    class="form-control"
+                    placeholder="Cidade"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>UF</label>
+                <div class="input-wrapper">
+                  <i class="fa-solid fa-map-pin icon-left"></i>
+                  <input
+                    type="text"
+                    id="login-new-republica-state"
+                    class="form-control"
+                    placeholder="UF"
+                    maxlength="2"
+                  />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Complemento</label>
+                <div class="input-wrapper">
+                  <i class="fa-regular fa-pen-to-square icon-left"></i>
+                  <input
+                    type="text"
+                    id="login-new-republica-complement"
+                    class="form-control"
+                    placeholder="Opcional"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Endereco completo</label>
+              <div class="input-wrapper">
+                <i class="fa-solid fa-location-crosshairs icon-left"></i>
+                <input
+                  type="text"
+                  id="login-new-republica-address"
+                  class="form-control"
+                  placeholder="O endereco sera montado aqui"
+                  readonly
+                />
+              </div>
+              <small class="helper-text">Quem criar a republica entra como administrador dela.</small>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-main" id="btn-submit-login-republic">
+            <span>Continuar</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
       </div>
     </div>
     <script>
@@ -82,7 +274,13 @@
         loginUrl: "{% url 'gerenciamento_republica:login' %}",
         signupUrl: "{% url 'gerenciamento_republica:cadastro' %}",
         signupPageUrl: "{% url 'gerenciamento_republica:cadastro-page' %}",
-        redirectUrl: "{% url 'gerenciamento_republica:painel-page' %}"
+        redirectUrl: "{% url 'gerenciamento_republica:painel-page' %}",
+        profileUrl: "{% url 'gerenciamento_republica:perfil-page' %}",
+        authMeUrl: "{% url 'gerenciamento_republica:me' %}",
+        enterRepublicUrl: "{% url 'gerenciamento_republica:entrar-republica' %}",
+        republicasUrl: "{% url 'gerenciamento_republica:republica-list' %}",
+        viaCepBaseUrl: "https://viacep.com.br/ws/",
+        mapsSearchBaseUrl: "https://www.google.com/maps/search/?api=1&query="
       };
     </script>
     <script src="{% static 'gerenciamento_republica/js/auth.js' %}"></script>

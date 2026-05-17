@@ -90,6 +90,53 @@
     return null;
   }
 
+  function setPaymentFieldError(form, fieldName, message) {
+    const field = form.elements[fieldName];
+    const error = form.querySelector(`[data-field-error="${fieldName}"]`);
+    const hasError = Boolean(message);
+
+    if (field) {
+      field.classList.toggle("input-error", hasError);
+      field.setAttribute("aria-invalid", hasError ? "true" : "false");
+    }
+
+    if (error) {
+      error.textContent = message || "";
+      error.classList.toggle("active", hasError);
+    }
+  }
+
+  function clearPaymentFieldErrors(form) {
+    setPaymentFieldError(form, "data_pagamento", "");
+    setPaymentFieldError(form, "comprovante_pagamento", "");
+  }
+
+  function validatePaymentForm(form) {
+    clearPaymentFieldErrors(form);
+
+    const dataPagamento = form.data_pagamento.value;
+    const comprovante = form.comprovante_pagamento.files[0];
+    let firstError = null;
+
+    if (!dataPagamento) {
+      firstError = "Informe a data em que a conta foi paga.";
+      setPaymentFieldError(form, "data_pagamento", firstError);
+    }
+
+    const proofMessage = validateProofFile(comprovante);
+    if (proofMessage) {
+      if (!firstError) firstError = proofMessage;
+      setPaymentFieldError(form, "comprovante_pagamento", proofMessage);
+    }
+
+    if (firstError) {
+      const invalidField = form.querySelector(".input-error");
+      if (invalidField) invalidField.focus();
+    }
+
+    return firstError;
+  }
+
   function buildExpenseCard(ctx, expense, variant) {
     const { state, formatMoney, formatDate, openModal } = ctx;
     const card = document.createElement("article");
@@ -140,6 +187,10 @@
       button.className = "btn btn-sm";
       button.innerHTML = '<i class="fa-solid fa-file-circle-check"></i> Registrar pagamento';
       button.addEventListener("click", () => {
+        const comprovanteForm = document.getElementById("comprovante-form");
+        if (comprovanteForm) {
+          clearPaymentFieldErrors(comprovanteForm);
+        }
         document.getElementById("comprovante-despesa-id").value = expense.id;
         document.getElementById("comprovante-despesa-titulo").value = expense.titulo;
         document.querySelector("#comprovante-form input[name='data_pagamento']").value =
@@ -353,13 +404,14 @@
     const { apiFetch, closeModal, reloadFinancialSources, showToast } = ctx;
     const form = event.currentTarget;
     const despesaId = document.getElementById("comprovante-despesa-id").value;
-    const comprovante = form.comprovante_pagamento.files[0];
-    const validationMessage = validateProofFile(comprovante);
+    const formValidationMessage = validatePaymentForm(form);
 
-    if (validationMessage) {
-      showToast(validationMessage, "danger");
+    if (formValidationMessage) {
+      showToast(formValidationMessage, "danger");
       return;
     }
+
+    const comprovante = form.comprovante_pagamento.files[0];
 
     const payload = new FormData();
     payload.append("status_pagamento", "PAGA");
@@ -391,6 +443,16 @@
 
     despesaForm.querySelector("input[name='data_despesa']").value = hoje;
     comprovanteForm.querySelector("input[name='data_pagamento']").value = hoje;
+
+    comprovanteForm.data_pagamento.addEventListener("input", () => {
+      if (comprovanteForm.data_pagamento.value) {
+        setPaymentFieldError(comprovanteForm, "data_pagamento", "");
+      }
+    });
+    comprovanteForm.comprovante_pagamento.addEventListener("change", () => {
+      const message = validateProofFile(comprovanteForm.comprovante_pagamento.files[0]);
+      setPaymentFieldError(comprovanteForm, "comprovante_pagamento", message);
+    });
 
     despesaForm.addEventListener("submit", (event) => submitDespesa(ctx, event));
     comprovanteForm.addEventListener("submit", (event) => submitComprovante(ctx, event));

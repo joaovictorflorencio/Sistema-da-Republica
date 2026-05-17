@@ -381,6 +381,35 @@ class DespesaApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('comprovante_pagamento', response.data)
 
+    def test_nao_permite_marcar_despesa_como_paga_sem_data_pagamento(self):
+        despesa = Despesa.objects.create(
+            republica=self.republica,
+            titulo='Conta de internet',
+            descricao='Plano mensal',
+            categoria='INTERNET',
+            valor_total='130.00',
+            paga_por=self.m1,
+            data_vencimento='2026-04-18',
+            data_despesa='2026-04-12',
+        )
+        comprovante = SimpleUploadedFile(
+            'comprovante.pdf',
+            b'conteudo do comprovante',
+            content_type='application/pdf',
+        )
+
+        response = self.client.patch(
+            f'/api/despesas/{despesa.id}/',
+            {
+                'status_pagamento': Despesa.StatusPagamento.PAGA,
+                'comprovante_pagamento': comprovante,
+            },
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('data_pagamento', response.data)
+
     def test_nao_permite_comprovante_com_extensao_invalida(self):
         despesa = Despesa.objects.create(
             republica=self.republica,
@@ -464,6 +493,23 @@ class AutenticacaoApiTests(APITestCase):
         self.assertIn('token', response.data)
         self.assertEqual(response.data['user']['username'], 'lucas')
         self.assertIsNotNone(response.data['morador_id'])
+
+    def test_cadastro_exige_republica_existente_ou_nova_republica(self):
+        response = self.client.post(
+            '/api/auth/cadastro/',
+            {
+                'username': 'sem_republica',
+                'email': 'sem-republica@example.com',
+                'password': 'SenhaForte123',
+                'password_confirm': 'SenhaForte123',
+                'nome': 'Sem Republica',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)
+        self.assertFalse(User.objects.filter(username='sem_republica').exists())
 
     def test_me_exige_autenticacao_e_retorna_usuario_logado(self):
         user = User.objects.create_user(
@@ -556,6 +602,144 @@ class AutenticacaoApiTests(APITestCase):
         morador = Morador.objects.get(usuario__username='nova_moradora')
         self.assertEqual(morador.republica.nome, 'Casa Aurora')
         self.assertTrue(morador.eh_admin)
+
+    def test_usuario_vinculado_nao_pode_entrar_em_outra_republica_sem_sair(self):
+        user = User.objects.create_user(
+            username='troca_login',
+            email='troca@example.com',
+            password='SenhaForte123',
+            first_name='Troca',
+        )
+        Morador.objects.create(
+            nome='Troca',
+            email=user.email,
+            usuario=user,
+            republica=self.republica,
+        )
+        outra_republica = Republica.objects.create(nome='Outra Casa', endereco='Rua C, 33')
+        self.client.force_authenticate(user=user)
+
+        response = self.client.post(
+            '/api/auth/entrar-republica/',
+            {'republica': outra_republica.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)
+
+    def test_usuario_pode_sair_e_entrar_em_outra_republica_preservando_historico(self):
+        user = User.objects.create_user(
+            username='mudanca_login',
+            email='mudanca@example.com',
+            password='SenhaForte123',
+            first_name='Mudanca',
+        )
+        morador_antigo = Morador.objects.create(
+            nome='Mudanca',
+            email=user.email,
+            usuario=user,
+            republica=self.republica,
+        )
+        outra_republica = Republica.objects.create(nome='Republica Nova', endereco='Rua Nova, 44')
+        Despesa.objects.create(
+            republica=self.republica,
+            titulo='Conta antiga',
+            descricao='Historico preservado',
+            categoria='OUTROS',
+            valor_total='55.00',
+            paga_por=morador_antigo,
+            data_despesa='2026-05-17',
+        )
+        self.client.force_authenticate(user=user)
+
+        sair = self.client.post('/api/auth/sair-republica/')
+
+        self.assertEqual(sair.status_code, status.HTTP_200_OK)
+        self.assertIsNone(sair.data['republica_id'])
+        morador_antigo.refresh_from_db()
+        self.assertFalse(morador_antigo.ativo)
+        self.assertIsNone(morador_antigo.usuario)
+        self.assertEqual(morador_antigo.despesas_pagas.count(), 1)
+
+        user.refresh_from_db()
+        self.client.force_authenticate(user=user)
+        entrar = self.client.post(
+            '/api/auth/entrar-republica/',
+            {'republica': outra_republica.id},
+            format='json',
+        )
+
+        self.assertEqual(entrar.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(entrar.data['republica_id'], outra_republica.id)
+        novo_morador = Morador.objects.get(usuario=user)
+        self.assertEqual(novo_morador.republica_id, outra_republica.id)
+        self.assertEqual(novo_morador.email, user.email)
+
+    def test_sair_da_republica_promove_outro_morador_com_usuario_quando_admin_sai(self):
+        admin = User.objects.create_user(
+            username='admin_sai',
+            email='admin-sai@example.com',
+            password='SenhaForte123',
+            first_name='Admin',
+        )
+        Morador.objects.create(
+            nome='Admin',
+            email=admin.email,
+            usuario=admin,
+            republica=self.republica,
+            eh_admin=True,
+        )
+        substituto_user = User.objects.create_user(
+            username='substituto_login',
+            email='substituto-login@example.com',
+            password='SenhaForte123',
+        )
+        substituto = Morador.objects.create(
+            nome='Substituto',
+            email='substituto@example.com',
+            usuario=substituto_user,
+            republica=self.republica,
+            eh_admin=False,
+        )
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post('/api/auth/sair-republica/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        substituto.refresh_from_db()
+        self.assertTrue(substituto.eh_admin)
+
+    def test_admin_nao_pode_sair_se_nao_houver_substituto_com_usuario(self):
+        admin = User.objects.create_user(
+            username='admin_sem_substituto',
+            email='admin-sem-substituto@example.com',
+            password='SenhaForte123',
+            first_name='Admin',
+        )
+        admin_morador = Morador.objects.create(
+            nome='Admin',
+            email=admin.email,
+            usuario=admin,
+            republica=self.republica,
+            eh_admin=True,
+        )
+        Morador.objects.create(
+            nome='Morador sem conta',
+            email='sem-conta@example.com',
+            republica=self.republica,
+            eh_admin=False,
+        )
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post('/api/auth/sair-republica/')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)
+        admin_morador.refresh_from_db()
+        self.assertTrue(admin_morador.ativo)
+        self.assertEqual(admin_morador.usuario_id, admin.id)
+        self.assertTrue(admin_morador.eh_admin)
 
 
 class EscopoRepublicaTests(APITestCase):

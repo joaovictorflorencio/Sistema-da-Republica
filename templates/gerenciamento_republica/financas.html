@@ -196,7 +196,7 @@
         </button>
       </div>
     </div>
-    <form id="comprovante-form">
+    <form id="comprovante-form" novalidate>
       <input type="hidden" name="despesa_id" id="comprovante-despesa-id" />
       <div class="modal-form-body">
         <div class="form-group">
@@ -206,10 +206,12 @@
         <div class="form-group">
           <label>Data do pagamento</label>
           <input type="date" class="form-control" name="data_pagamento" required />
+          <small class="field-error" data-field-error="data_pagamento"></small>
         </div>
         <div class="form-group">
           <label>Comprovante ou boleto quitado</label>
           <input type="file" class="form-control" name="comprovante_pagamento" accept=".pdf,.png,.jpg,.jpeg,.webp" required />
+          <small class="field-error" data-field-error="comprovante_pagamento"></small>
         </div>
         <p class="helper-text financas-modal-note">
           Esse arquivo serve como prova da quitacao. Formatos aceitos: PDF, PNG, JPG e WEBP ate 5 MB.

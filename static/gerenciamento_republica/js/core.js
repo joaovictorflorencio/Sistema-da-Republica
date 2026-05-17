@@ -165,6 +165,12 @@
     applyUserUI();
 
     if (!state.currentUser.republica_id) {
+      if (document.body.dataset.page === "perfil") {
+        state.currentOverview = null;
+        state.currentMoradores = [];
+        state.currentResumo = null;
+        return;
+      }
       throw new Error("Usuario sem republica");
     }
 
@@ -235,9 +241,9 @@
       });
     } catch (error) {
       if (error && error.message === "Usuario sem republica") {
-        showToast("Seu usuario ainda nao esta vinculado a uma republica. Vamos para o cadastro.", "warning");
+        showToast("Seu usuario ainda nao esta vinculado a uma republica. Escolha uma no perfil.", "warning");
         setTimeout(() => {
-          window.location.href = urls.cadastro;
+          window.location.href = urls.perfil;
         }, 1000);
         return;
       }

@@ -6,63 +6,111 @@
 {% block page_title %}Meu perfil{% endblock %}
 
 {% block content %}
-<div class="profile-layout">
-  <div class="card profile-summary-card">
-    <div class="profile-summary-head">
-      <div class="profile-avatar" id="perfil-avatar">R</div>
-      <div class="profile-summary-text">
-        <h3 id="perfil-nome-atual">Usuario</h3>
-        <p id="perfil-papel-atual" class="helper-text">Morador da republica</p>
+<div class="profile-page">
+  <section class="profile-hero-card">
+    <div class="profile-hero-glow"></div>
+    <div class="profile-hero-content">
+      <div class="profile-identity">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar" id="perfil-avatar">R</div>
+        </div>
+        <div class="profile-summary-text">
+          <span class="profile-eyebrow">Conta do usuario</span>
+          <h3 id="perfil-nome-atual">Usuario</h3>
+          <p id="perfil-papel-atual">Morador da republica</p>
+        </div>
+      </div>
+
+      <div class="profile-meta-grid">
+        <div class="profile-meta-item">
+          <i class="fa-solid fa-at"></i>
+          <div>
+            <span>Username</span>
+            <strong id="perfil-username">@usuario</strong>
+          </div>
+        </div>
+        <div class="profile-meta-item">
+          <i class="fa-regular fa-envelope"></i>
+          <div>
+            <span>E-mail</span>
+            <strong id="perfil-email">usuario@email.com</strong>
+          </div>
+        </div>
+        <div class="profile-meta-item">
+          <i class="fa-solid fa-house"></i>
+          <div>
+            <span>Republica</span>
+            <strong id="perfil-republica">Sem republica</strong>
+          </div>
+        </div>
       </div>
     </div>
+  </section>
 
-    <div class="profile-meta-list">
-      <div class="profile-meta-item">
-        <span class="helper-text">Username</span>
-        <strong id="perfil-username">@usuario</strong>
-      </div>
-      <div class="profile-meta-item">
-        <span class="helper-text">E-mail</span>
-        <strong id="perfil-email">usuario@email.com</strong>
-      </div>
-      <div class="profile-meta-item">
-        <span class="helper-text">Republica</span>
-        <strong id="perfil-republica">Sem republica</strong>
-      </div>
-    </div>
-  </div>
-
-  <div class="card profile-form-card">
-    <div class="card-header">
-      <h3 class="card-title"><i class="fa-solid fa-pen"></i> Alterar nome</h3>
-      <span class="helper-text">Seu nome sera atualizado no login e na sua identificacao como morador.</span>
-    </div>
-
-    <form id="perfil-form">
-      <div class="form-group">
-        <label for="perfil-nome-input">Nome</label>
-        <input
-          type="text"
-          id="perfil-nome-input"
-          name="nome"
-          class="form-control"
-          placeholder="Seu nome"
-          maxlength="100"
-          required
-        />
+  <div class="profile-panels-grid">
+    <section class="card profile-panel-card">
+      <div class="profile-panel-header">
+        <div>
+          <span class="profile-panel-kicker">Identificacao</span>
+          <h3 class="card-title"><i class="fa-solid fa-pen"></i> Alterar nome</h3>
+        </div>
+        <span class="profile-soft-badge">Avatar automatico</span>
       </div>
 
-      <div class="profile-form-note helper-text">
-        O avatar continua sendo gerado automaticamente pela inicial do seu nome.
+      <p class="profile-panel-copy">
+        Esse nome aparece no cabecalho, nas tarefas e na identificacao do morador dentro da republica.
+      </p>
+
+      <form id="perfil-form" class="profile-form">
+        <div class="form-group">
+          <label for="perfil-nome-input">Nome</label>
+          <input
+            type="text"
+            id="perfil-nome-input"
+            name="nome"
+            class="form-control"
+            placeholder="Seu nome"
+            maxlength="100"
+            required
+          />
+        </div>
+
+        <div class="profile-form-note">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          O avatar usa automaticamente a primeira letra do nome.
+        </div>
+
+        <div class="profile-actions">
+          <button type="submit" class="btn">
+            <i class="fa-solid fa-floppy-disk"></i>
+            Salvar nome
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card profile-panel-card profile-republic-card">
+      <div class="profile-panel-header">
+        <div>
+          <span class="profile-panel-kicker">Vinculo</span>
+          <h3 class="card-title"><i class="fa-solid fa-house-user"></i> Republica</h3>
+        </div>
+        <span class="profile-soft-badge">Historico preservado</span>
       </div>
 
-      <div class="modal-actions profile-actions">
-        <button type="submit" class="btn">
-          <i class="fa-solid fa-floppy-disk"></i>
-          Salvar nome
+      <p class="profile-panel-copy">
+        Ao sair de uma republica, o historico antigo permanece guardado. Para entrar em outra casa, faca login novamente e escolha a republica na tela de entrada.
+      </p>
+
+      <div id="perfil-republica-status" class="profile-republic-status"></div>
+
+      <div class="profile-actions" id="perfil-leave-republica-actions">
+        <button type="button" class="btn btn-outline btn-danger-outline" id="perfil-leave-republica-btn">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          Sair da republica
         </button>
       </div>
-    </form>
+    </section>
   </div>
 </div>
 {% endblock %}

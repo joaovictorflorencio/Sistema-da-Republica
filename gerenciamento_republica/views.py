@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import logout
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.db.models import Count
 from django.db.models import F
 from django.db.models import Q
@@ -22,6 +23,7 @@ from .serializers import (
     DashboardOverviewSerializer,
     DespesaSerializer,
     DivisaoDespesaSerializer,
+    EntrarRepublicaSerializer,
     LoginSerializer,
     MoradorSerializer,
     PagamentoSerializer,
@@ -57,12 +59,36 @@ def perfil_page(request):
 
 
 def get_user_republica(user):
-    morador = getattr(user, 'morador', None)
+    morador = get_user_morador(user)
     return morador.republica if morador else None
 
 
 def get_user_morador(user):
-    return getattr(user, 'morador', None)
+    morador = getattr(user, 'morador', None)
+    if not morador or not morador.ativo:
+        return None
+    return morador
+
+
+def serializar_usuario_atualizado(user):
+    user = user.__class__.objects.get(pk=user.pk)
+    return UsuarioSerializer(user).data
+
+
+def promover_novo_admin_se_necessario(republica):
+    if republica.moradores.filter(ativo=True, eh_admin=True).exists():
+        return None
+
+    novo_admin = republica.moradores.filter(
+        ativo=True,
+        usuario__isnull=False,
+    ).order_by('data_entrada', 'id').first()
+    if not novo_admin:
+        return None
+
+    novo_admin.eh_admin = True
+    novo_admin.save(update_fields=['eh_admin'])
+    return novo_admin
 
 
 def construir_resumo_financeiro_morador(morador):
@@ -551,3 +577,73 @@ class MeView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         return Response(UsuarioSerializer(user).data)
+
+
+class SairRepublicaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        morador = get_user_morador(request.user)
+        if not morador:
+            raise ValidationError({'detail': 'Seu usuario nao esta vinculado a uma republica.'})
+
+        republica = morador.republica
+        era_admin = morador.eh_admin
+        tem_substituto_admin = republica.moradores.filter(
+            ativo=True,
+            usuario__isnull=False,
+        ).exclude(pk=morador.pk).exists()
+
+        if era_admin and not tem_substituto_admin:
+            raise ValidationError(
+                {
+                    'detail': (
+                        'Antes de sair da republica, vincule outro morador com conta de usuario '
+                        'para assumir como administrador.'
+                    )
+                }
+            )
+
+        morador.usuario = None
+        morador.ativo = False
+        morador.eh_admin = False
+        morador.save(update_fields=['usuario', 'ativo', 'eh_admin'])
+
+        if era_admin:
+            promover_novo_admin_se_necessario(republica)
+
+        return Response(serializar_usuario_atualizado(request.user))
+
+
+class EntrarRepublicaView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        if get_user_morador(request.user):
+            raise ValidationError(
+                {'detail': 'Saia da republica atual antes de entrar em outra.'}
+            )
+
+        serializer = EntrarRepublicaSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        republica = serializer.validated_data['republica']
+        email = (request.user.email or '').strip()
+        if not email:
+            raise ValidationError({'detail': 'Seu usuario precisa ter um email para entrar em uma republica.'})
+
+        nome_morador = (
+            request.user.get_full_name().strip()
+            or request.user.first_name.strip()
+            or request.user.username
+        )
+        Morador.objects.create(
+            nome=nome_morador,
+            email=email,
+            usuario=request.user,
+            republica=republica,
+            eh_admin=False,
+        )
+
+        return Response(serializar_usuario_atualizado(request.user), status=status.HTTP_201_CREATED)

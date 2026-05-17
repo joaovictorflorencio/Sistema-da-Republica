@@ -81,6 +81,48 @@ body {
 
 .subtitle { color: var(--text-muted); font-size: 0.95em; margin-bottom: 25px; }
 
+.login-republic-helper {
+  margin: -6px 0 14px;
+  color: var(--text-muted);
+  font-size: 0.82em;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.login-session-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(0, 86, 254, 0.14);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #f8fbff, #ffffff);
+  margin-bottom: 22px;
+  text-align: left;
+}
+
+.login-session-card span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.76em;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.login-session-card strong {
+  display: block;
+  color: var(--text-main);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.btn-compact {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  font-size: 0.78em;
+}
+
 .alert-box {
   padding: 12px; border-radius: var(--radius-md); font-size: 0.85em; margin-bottom: 20px;
   display: none; align-items: center; gap: 10px; text-align: left; font-weight: 600;
@@ -223,6 +265,7 @@ body {
 
 @media (max-width: 480px) {
   .form-row { grid-template-columns: 1fr; gap: 0; }
+  .login-session-card { flex-direction: column; align-items: flex-start; }
   .auth-container { padding: 30px 20px; }
   .inline-actions { flex-direction: column; }
 }
