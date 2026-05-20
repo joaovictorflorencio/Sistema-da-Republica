@@ -1,5 +1,7 @@
 (function () {
   function renderDashboard(ctx) {
+    // O dashboard e uma visao rapida: mostra os principais indicadores para o
+    // morador entender a situacao da casa sem entrar em cada tela.
     const { state, formatMoney, renderList, getMeuSaldo } = ctx;
     const saldo = getMeuSaldo();
     const adminMorador = state.currentMoradores.find((morador) => morador.eh_admin);

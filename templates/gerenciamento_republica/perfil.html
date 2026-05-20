@@ -48,6 +48,7 @@
   </section>
 
   <div class="profile-panels-grid">
+    <!-- Edicao simples: o perfil altera apenas dados de exibicao do usuario. -->
     <section class="card profile-panel-card">
       <div class="profile-panel-header">
         <div>
@@ -112,6 +113,7 @@
       </div>
     </section>
 
+    <!-- Area exibida somente para o admin da republica transferir a administracao. -->
     <section class="card profile-panel-card profile-admin-card hidden" id="perfil-transfer-admin-card">
       <div class="profile-panel-header">
         <div>
@@ -145,6 +147,7 @@
       </form>
     </section>
 
+    <!-- Exclusao de conta exige confirmacao e preserva o historico da republica. -->
     <section class="card profile-panel-card profile-danger-card">
       <div class="profile-panel-header">
         <div>
@@ -179,6 +182,7 @@
 {% endblock %}
 
 {% block modals %}
+<!-- Modal separado para reforcar que excluir conta e uma acao irreversivel. -->
 <div class="modal-overlay" id="modal-delete-account">
   <div class="modal-content">
     <div class="modal-header">

@@ -13,6 +13,7 @@
   let pendingLoginData = null;
 
   if (localStorage.getItem(tokenKey)) {
+    // Quem ja esta autenticado nao precisa ver login/cadastro novamente.
     window.location.href = redirectUrl;
     return;
   }
@@ -52,6 +53,8 @@
   }
 
   function showRepublicStep(data) {
+    // Login em duas etapas: senha primeiro; republica apenas se a conta ainda
+    // nao tiver vinculo ativo.
     pendingLoginData = data;
     const userLabel = data.user?.first_name || data.user?.email || data.user?.username || "Usuario";
     const pendingUser = document.getElementById("login-pending-user");
@@ -61,6 +64,7 @@
   }
 
   function setFieldError(inputId, message) {
+    // Exibe o erro no campo certo, melhorando a leitura para o usuario.
     const input = document.getElementById(inputId);
     const wrapper = input?.closest(".input-wrapper");
     const error = document.getElementById(`${inputId}-error`);
@@ -79,6 +83,7 @@
   }
 
   function validateSignupPasswords(options = {}) {
+    // Valida senha no frontend para dar resposta imediata, antes da API.
     const showGlobalAlert = options.showGlobalAlert === true;
     const passwordInput = document.getElementById("signup-password");
     const confirmInput = document.getElementById("signup-password-confirm");
@@ -139,6 +144,8 @@
   }
 
   function composeRepublicAddress(prefix = "signup") {
+    // Os campos de endereco ficam separados na tela, mas a API recebe um texto
+    // unico e organizado para guardar na republica.
     const street = document.getElementById(`${prefix}-new-republica-street`)?.value.trim() || "";
     const number = document.getElementById(`${prefix}-new-republica-number`)?.value.trim() || "";
     const neighborhood = document.getElementById(`${prefix}-new-republica-neighborhood`)?.value.trim() || "";
@@ -181,6 +188,7 @@
   }
 
   function setupRepublicAddressHelpers(prefix = "signup") {
+    // A mesma logica de CEP atende cadastro e segunda etapa do login.
     const cepInput = document.getElementById(`${prefix}-new-republica-cep`);
     const addressPreview = document.getElementById(`${prefix}-new-republica-address`);
     const searchButton = document.getElementById(`${prefix}-cep-search-btn`);
@@ -210,6 +218,7 @@
     });
 
     async function searchCep() {
+      // Consulta o ViaCEP e preenche somente o que o servico retornar.
       if (cepLookupInProgress) return;
 
       const cep = onlyDigits(cepInput.value);
@@ -281,6 +290,7 @@
   const loginRepublicAddressHelpers = setupRepublicAddressHelpers("login");
 
   function setupSignupModeToggle() {
+    // O cadastro exige uma escolha clara: entrar em republica existente ou criar nova.
     const buttons = document.querySelectorAll("[data-signup-mode]");
     if (!buttons.length) return;
 
@@ -320,6 +330,8 @@
   setupSignupModeToggle();
 
   function setupLoginRepublicModeToggle() {
+    // Quando a conta loga sem republica, esta etapa resolve o vinculo antes de
+    // liberar o painel principal.
     const buttons = document.querySelectorAll("[data-login-republic-mode]");
     if (!buttons.length) return;
 
@@ -467,6 +479,7 @@
   }
 
   async function vincularRepublicaNoLogin(data) {
+    // Se o usuario ja tem republica, o backend ignora esta etapa e seguimos.
     if (data.user?.republica_id || !document.getElementById("login-republic-mode-toggle")) {
       return;
     }

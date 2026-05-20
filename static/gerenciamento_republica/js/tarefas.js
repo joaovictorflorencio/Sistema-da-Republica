@@ -1,5 +1,7 @@
 (function () {
   function escapeHtml(value) {
+    // Titulo e descricao podem vir de usuarios. Escapamos antes de montar HTML
+    // para evitar que texto digitado vire codigo na pagina.
     return String(value || "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
@@ -9,6 +11,7 @@
   }
 
   function renderTaskDescription(tarefa) {
+    // A descricao e opcional; quando vazia, o card fica mais limpo.
     const descricao = String(tarefa.descricao || "").trim();
     if (!descricao) {
       return "";
@@ -26,6 +29,7 @@
     const { apiFetch, renderList, fillSelect, formatDate, formatDateTime } = ctx;
     const response = await apiFetch("/api/tarefas/");
     const tarefas = await response.json();
+    // Tarefas concluidas saem do quadro principal e ficam apenas no historico.
     const tarefasConcluidas = tarefas
       .filter((tarefa) => tarefa.status === "CONCLUIDA")
       .sort((a, b) => {
@@ -47,6 +51,7 @@
       EM_ANDAMENTO: "andamento",
     };
 
+    // O quadro principal mostra somente o que ainda precisa ser feito.
     tarefas
       .filter((tarefa) => tarefa.status !== "CONCLUIDA")
       .forEach((tarefa) => {
@@ -114,6 +119,7 @@
   }
 
   async function updateTaskStatus(ctx, taskId, status) {
+    // O drag and drop e o botao "Concluir" passam pela mesma atualizacao.
     const { apiFetch, showToast } = ctx;
     const response = await apiFetch(`/api/tarefas/${taskId}/`, {
       method: "PATCH",
@@ -131,6 +137,7 @@
     event.preventDefault();
     const { state, apiFetch, closeModal, showToast } = ctx;
     const form = event.currentTarget;
+    // A tarefa sempre nasce dentro da republica do usuario autenticado.
     const payload = {
       republica: state.currentUser.republica_id,
       titulo: form.titulo.value,

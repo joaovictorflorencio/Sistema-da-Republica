@@ -34,6 +34,7 @@ from .serializers import (
     UsuarioSerializer,
 )
 
+
 def login_page(request):
     return render(request, 'gerenciamento_republica/login.html')
 
@@ -64,6 +65,8 @@ def get_user_republica(user):
 
 
 def get_user_morador(user):
+    # O sistema considera apenas moradores ativos. Registros antigos ficam no
+    # banco para preservar historico, mas nao representam vinculo atual.
     morador = getattr(user, 'morador', None)
     if not morador or not morador.ativo:
         return None
@@ -76,6 +79,8 @@ def serializar_usuario_atualizado(user):
 
 
 def promover_novo_admin_se_necessario(republica):
+    # Ao sair um admin, o sistema promove apenas moradores ativos com conta de
+    # usuario. Isso evita criar um "admin fantasma" sem login.
     if republica.moradores.filter(ativo=True, eh_admin=True).exists():
         return None
 
@@ -92,6 +97,8 @@ def promover_novo_admin_se_necessario(republica):
 
 
 def construir_resumo_financeiro_morador(morador):
+    # O resumo separa responsabilidade pela conta de quem realmente anexou o
+    # comprovante. Essa diferenca evita leituras incorretas no quadro financeiro.
     despesas_responsaveis = morador.despesas_pagas.filter(
         republica=morador.republica
     )
@@ -126,6 +133,8 @@ def construir_resumo_financeiro_morador(morador):
 
 
 class RepublicaScopedMixin:
+    """Centraliza as regras de isolamento por republica nas APIs."""
+
     republica_lookup = 'republica'
 
     def get_user_republica(self):
@@ -141,6 +150,7 @@ class RepublicaScopedMixin:
         return republica
 
     def user_is_republic_admin(self, republica=None):
+        # Staff e o poder tecnico global; admin da republica e o papel de negocio.
         if self.request.user.is_staff:
             return True
 
@@ -154,6 +164,7 @@ class RepublicaScopedMixin:
         return morador.republica_id == republica.id
 
     def get_scoped_queryset(self, queryset):
+        # Usuarios comuns enxergam apenas dados da propria republica.
         if self.request.user.is_staff:
             return queryset
 
@@ -165,6 +176,7 @@ class RepublicaScopedMixin:
         return queryset.filter(**{self.republica_lookup: republica})
 
     def validate_user_republica(self, republica):
+        # Protecao contra acesso direto a IDs de outra republica pela API.
         if self.request.user.is_staff:
             return
 
@@ -175,6 +187,7 @@ class RepublicaScopedMixin:
             raise PermissionDenied('Voce so pode acessar dados da sua propria republica.')
 
     def ensure_republic_admin(self, republica, message='Voce nao tem permissao para alterar esse recurso.'):
+        # Usado antes de operacoes sensiveis, como alterar despesas ou moradores.
         if not self.user_is_republic_admin(republica):
             raise PermissionDenied(message)
 
@@ -198,6 +211,7 @@ class RepublicaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
             serializer.save()
             return
 
+        # Quem cria uma republica pelo fluxo comum passa a ser o primeiro admin.
         if self.get_user_republica():
             raise ValidationError({'detail': 'Voce ja esta vinculado a uma republica.'})
 
@@ -299,6 +313,7 @@ class DespesaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
             serializer.save()
             return
         republica = self.get_required_user_republica()
+        # No fluxo atual, apenas o admin da republica cadastra novas contas.
         self.ensure_republic_admin(
             republica,
             'Somente o administrador da republica pode cadastrar despesas.',
@@ -306,6 +321,8 @@ class DespesaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
         serializer.save(republica=republica)
 
     def _usuario_pode_quitar_despesa(self, despesa, campos_alterados):
+        # Morador comum nao edita a despesa inteira; ele so registra pagamento
+        # da conta que esta atribuida a ele.
         morador = self.get_user_morador()
         if (
             not morador
@@ -327,6 +344,8 @@ class DespesaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
         self.validate_user_republica(despesa.republica)
         campos_alterados = set(serializer.validated_data.keys())
         morador_atual = self.get_user_morador()
+        # Se o pagamento vem do morador logado, registramos quem quitou sem
+        # depender de campo enviado pelo frontend.
         marcando_como_paga = (
             serializer.validated_data.get('status_pagamento') == Despesa.StatusPagamento.PAGA
         )
@@ -428,6 +447,8 @@ class TarefaViewSet(RepublicaScopedMixin, viewsets.ModelViewSet):
             serializer.save()
             return
 
+        # Para simplificar o MVP, morador comum pode organizar o andamento, mas
+        # nao altera titulo, responsavel ou prazo de uma tarefa.
         campos_alterados = set(serializer.validated_data.keys())
         if campos_alterados - {'status'}:
             raise PermissionDenied(
@@ -580,12 +601,16 @@ class MeView(APIView):
 
     @transaction.atomic
     def delete(self, request):
+        # Excluir a conta remove o login, mas nao apaga o morador antigo. Isso
+        # preserva historico de despesas, tarefas e comprovantes da republica.
         user = request.user
         morador = get_user_morador(user)
 
         if morador:
             republica = morador.republica
             era_admin = morador.eh_admin
+            # Um admin so pode excluir a conta se houver outro morador ativo,
+            # com usuario vinculado, capaz de assumir a administracao.
             tem_substituto_admin = republica.moradores.filter(
                 ativo=True,
                 usuario__isnull=False,
@@ -607,8 +632,11 @@ class MeView(APIView):
             morador.save(update_fields=['usuario', 'ativo', 'eh_admin'])
 
             if era_admin:
+                # A promocao automatica e uma protecao extra caso a tela nao
+                # tenha transferido o papel antes da exclusao.
                 promover_novo_admin_se_necessario(republica)
 
+        # Depois da exclusao, tokens antigos deixam de ser validos.
         Token.objects.filter(user=user).delete()
         logout(request)
         user.delete()
@@ -632,6 +660,8 @@ class SairRepublicaView(APIView):
         ).exclude(pk=morador.pk).exists()
 
         if era_admin and not tem_substituto_admin:
+            # A saida do ultimo admin com login e bloqueada para nao deixar a
+            # republica sem responsavel operacional.
             raise ValidationError(
                 {
                     'detail': (
@@ -657,6 +687,8 @@ class TransferirAdminView(APIView):
 
     @transaction.atomic
     def post(self, request):
+        # Transferencia de admin e uma regra sensivel: apenas o admin atual da
+        # propria republica pode escolher o substituto.
         morador_atual = get_user_morador(request.user)
         if not morador_atual or not morador_atual.eh_admin:
             raise PermissionDenied('Somente o administrador atual pode transferir a administracao.')
@@ -672,12 +704,16 @@ class TransferirAdminView(APIView):
             ativo=True,
         )
 
+        # O novo admin precisa ser outra pessoa e precisa conseguir acessar o
+        # sistema com uma conta propria.
         if novo_admin.pk == morador_atual.pk:
             raise ValidationError({'morador_id': 'Escolha outro morador para assumir a administracao.'})
 
         if not novo_admin.usuario_id:
             raise ValidationError({'morador_id': 'O novo administrador precisa ter uma conta de usuario vinculada.'})
 
+        # Mantemos apenas um administrador de negocio por republica para evitar
+        # conflito na demonstracao e nas regras de permissao.
         Morador.objects.filter(republica=morador_atual.republica, eh_admin=True).update(eh_admin=False)
         novo_admin.eh_admin = True
         novo_admin.save(update_fields=['eh_admin'])
@@ -696,6 +732,7 @@ class EntrarRepublicaView(APIView):
 
     @transaction.atomic
     def post(self, request):
+        # O usuario so pode entrar em uma nova republica depois de sair da atual.
         if get_user_morador(request.user):
             raise ValidationError(
                 {'detail': 'Saia da republica atual antes de entrar em outra.'}

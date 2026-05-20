@@ -42,6 +42,7 @@
   }
 
   function isOverdue(expense) {
+    // Conta vencida continua pendente; apenas recebe destaque visual.
     return !isPaid(expense) && Boolean(expense.data_vencimento) && expense.data_vencimento < getTodayISO();
   }
 
@@ -65,6 +66,8 @@
   }
 
   function canConfirmPayment(state, expense) {
+    // O admin pode acompanhar tudo, mas o morador comum so quita a conta
+    // atribuida diretamente a ele.
     return (
       state.currentUser.is_staff ||
       state.currentUser.morador_eh_admin ||
@@ -73,6 +76,7 @@
   }
 
   function validateProofFile(file) {
+    // O frontend antecipa a mesma regra de comprovante aplicada pelo backend.
     if (!file) {
       return "Selecione um comprovante para registrar o pagamento.";
     }
@@ -112,6 +116,8 @@
   }
 
   function validatePaymentForm(form) {
+    // Registrar pagamento exige data e comprovante; sem ambos a conta continua
+    // como pendente.
     clearPaymentFieldErrors(form);
 
     const dataPagamento = form.data_pagamento.value;
@@ -138,6 +144,7 @@
   }
 
   function buildExpenseCard(ctx, expense, variant) {
+    // Cada card reflete o estado real da conta: pendente, vencida ou paga.
     const { state, formatMoney, formatDate, openModal } = ctx;
     const card = document.createElement("article");
     card.className = `financas-card financas-card-${variant}`;
@@ -223,6 +230,7 @@
     const despesasResponse = await apiFetch("/api/despesas/");
     const despesas = await despesasResponse.json();
 
+    // O quadro separa o que ainda precisa de acao do que ja foi comprovado.
     const pendentes = despesas
       .filter((expense) => !isPaid(expense))
       .sort((a, b) => compareByDate(a, b, "data_vencimento", "asc"));
@@ -234,6 +242,7 @@
       .sort((a, b) => compareByDate(a, b, "data_vencimento", "asc"));
     const minhasPendentes = minhasContas.filter((expense) => !isPaid(expense));
 
+    // O resumo por morador considera quem e responsavel pela conta cadastrada.
     const resumoResponsaveis = state.currentMoradores.map((morador) => {
       const contas = despesas.filter((expense) => Number(expense.paga_por) === Number(morador.id));
       const contasPendentes = contas.filter((expense) => !isPaid(expense));
@@ -370,6 +379,7 @@
     const { state, apiFetch, closeModal, reloadFinancialSources, showToast } = ctx;
     const form = event.currentTarget;
 
+    // A republica vem do usuario logado para evitar cadastro em republica errada.
     const payload = {
       republica: state.currentUser.republica_id,
       titulo: form.titulo.value,
@@ -413,6 +423,7 @@
 
     const comprovante = form.comprovante_pagamento.files[0];
 
+    // FormData e usado porque o comprovante e um arquivo real, nao JSON.
     const payload = new FormData();
     payload.append("status_pagamento", "PAGA");
     payload.append("data_pagamento", form.data_pagamento.value);

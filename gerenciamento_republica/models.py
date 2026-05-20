@@ -23,6 +23,8 @@ class Republica(models.Model):
 class Morador(models.Model):
     nome = models.CharField(max_length=100)
     email = models.EmailField()
+    # O vinculo com usuario pode ser removido quando alguem sai da republica.
+    # Assim, o historico financeiro e de tarefas continua preservado no morador antigo.
     usuario = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -75,6 +77,8 @@ class Despesa(models.Model):
         default=Categoria.OUTROS,
     )
     valor_total = models.DecimalField(max_digits=10, decimal_places=2)
+    # "paga_por" e o morador responsavel pela conta; "quitada_por" registra quem
+    # realmente informou o pagamento com comprovante.
     paga_por = models.ForeignKey(
         Morador,
         on_delete=models.PROTECT,
@@ -114,6 +118,8 @@ class Despesa(models.Model):
         ]
 
     def clean(self):
+        # Toda despesa deve permanecer dentro da mesma republica, inclusive quando
+        # os dados chegam por uma requisicao manipulada.
         if self.paga_por_id and self.republica_id:
             if self.paga_por.republica_id != self.republica_id:
                 raise ValidationError(
@@ -124,6 +130,8 @@ class Despesa(models.Model):
                 raise ValidationError(
                     {'quitada_por': 'Quem quitou a conta precisa pertencer a mesma republica da despesa.'}
                 )
+        # Uma despesa so vira paga quando existe data e comprovante. Sem isso, ela
+        # continua pendente para evitar registros financeiros sem evidencia.
         if self.status_pagamento == self.StatusPagamento.PAGA:
             if not self.data_pagamento:
                 raise ValidationError(
@@ -133,6 +141,7 @@ class Despesa(models.Model):
                 raise ValidationError(
                     {'comprovante_pagamento': 'Anexe o comprovante para concluir o pagamento.'}
                 )
+        # Ao voltar para pendente, dados de quitacao deixam de fazer sentido.
         if self.status_pagamento == self.StatusPagamento.PENDENTE:
             self.data_pagamento = None
             self.quitada_por = None
@@ -185,6 +194,7 @@ class DivisaoDespesa(models.Model):
         ]
 
     def clean(self):
+        # A divisao de despesa e mantida restrita a moradores da propria republica.
         if self.despesa_id and self.morador_id:
             if self.despesa.republica_id != self.morador.republica_id:
                 raise ValidationError(
@@ -201,6 +211,7 @@ class DivisaoDespesa(models.Model):
         return restante if restante > Decimal('0.00') else Decimal('0.00')
 
     def recalcular_status(self):
+        # O status da divisao e derivado dos valores, evitando divergencia manual.
         if self.valor_pago <= Decimal('0.00'):
             self.status = self.Status.PENDENTE
         elif self.valor_pago < self.valor_devido:
@@ -258,6 +269,7 @@ class Pagamento(models.Model):
     def clean(self):
         errors = {}
 
+        # Pagamentos e acertos precisam respeitar o limite da republica de origem.
         if self.pagador_id and self.republica_id and self.pagador.republica_id != self.republica_id:
             errors['pagador'] = 'O pagador precisa pertencer a mesma republica.'
 
@@ -322,6 +334,8 @@ class PagamentoDivisao(models.Model):
     def clean(self):
         errors = {}
 
+        # A aplicacao do pagamento impede que um acerto seja usado em despesa,
+        # morador ou republica diferente da origem.
         if self.pagamento_id and self.divisao_id:
             if self.pagamento.republica_id != self.divisao.despesa.republica_id:
                 errors['divisao'] = 'A divisao precisa pertencer a mesma republica do pagamento.'
@@ -387,6 +401,8 @@ class Tarefa(models.Model):
         verbose_name_plural = 'Tarefas'
 
     def clean(self):
+        # A tarefa pode ficar sem responsavel, mas quando houver responsavel ele
+        # precisa ser morador da mesma republica.
         if self.responsavel_id and self.republica_id:
             if self.responsavel.republica_id != self.republica_id:
                 raise ValidationError(

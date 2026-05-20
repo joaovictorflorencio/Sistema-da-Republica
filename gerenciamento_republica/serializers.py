@@ -29,6 +29,8 @@ MAX_COMPROVANTE_SIZE = 5 * 1024 * 1024
 
 
 def _build_instance(serializer, model_class, attrs):
+    # Monta uma instancia temporaria com os dados atuais + dados novos. Isso
+    # permite chamar full_clean() em updates parciais sem salvar nada antes.
     if serializer.instance is None:
         return model_class(**attrs)
 
@@ -45,6 +47,7 @@ def _build_instance(serializer, model_class, attrs):
 
 
 def _validate_comprovante_file(uploaded_file):
+    # A validacao fica centralizada para frontend e backend seguirem a mesma regra.
     if not uploaded_file:
         return
 
@@ -99,6 +102,8 @@ class UsuarioSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def _get_morador_ativo(self, obj):
+        # Usuarios que sairam da republica mantem historico, mas deixam de ter
+        # vinculo ativo para navegar no sistema.
         morador = getattr(obj, 'morador', None)
         if not morador or not morador.ativo:
             return None
@@ -139,6 +144,7 @@ class PerfilUpdateSerializer(serializers.Serializer):
         instance.first_name = nome
         instance.save(update_fields=['first_name'])
 
+        # O nome exibido no perfil e no morador precisa caminhar junto.
         morador = getattr(instance, 'morador', None)
         if morador:
             morador.nome = nome
@@ -192,6 +198,8 @@ class CadastroUsuarioSerializer(serializers.Serializer):
         nova_republica_nome = (attrs.get('nova_republica_nome') or '').strip()
         nova_republica_endereco = (attrs.get('nova_republica_endereco') or '').strip()
 
+        # O cadastro ja nasce vinculado a uma republica: o usuario entra em uma
+        # existente ou cria uma nova e vira admin dela.
         if not republica and not nova_republica_nome and not nova_republica_endereco:
             raise serializers.ValidationError(
                 {'detail': 'Escolha uma republica existente ou crie uma nova para concluir o cadastro.'}
@@ -222,6 +230,8 @@ class CadastroUsuarioSerializer(serializers.Serializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        # A criacao de usuario, republica e morador acontece na mesma transacao
+        # para evitar conta criada pela metade em caso de erro.
         validated_data.pop('password_confirm')
         republica = validated_data.pop('republica', None)
         nova_republica_nome = validated_data.pop('nova_republica_nome', '').strip()
@@ -265,6 +275,8 @@ class LoginSerializer(serializers.Serializer):
         if not identifier:
             raise serializers.ValidationError({'detail': 'Informe username ou email.'})
 
+        # A tela usa email, mas o Django autentica por username. Por isso,
+        # localizamos o usuario pelo email antes de chamar authenticate().
         username = attrs.get('username')
         if attrs.get('email'):
             user = User.objects.filter(email__iexact=attrs['email']).first()
@@ -300,6 +312,7 @@ class MoradorSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'usuario', 'usuario_username']
 
     def validate(self, attrs):
+        # Evita que uma edicao maliciosa mova um morador entre republicas.
         if (
             self.instance
             and 'republica' in attrs
@@ -387,6 +400,8 @@ class DespesaSerializer(serializers.ModelSerializer):
         if attrs.get('comprovante_pagamento') is not None:
             _validate_comprovante_file(attrs['comprovante_pagamento'])
 
+        # Quando o morador envia data/comprovante pela tela, a despesa deve ser
+        # interpretada como quitada mesmo em um PATCH parcial.
         if (
             'status_pagamento' not in attrs
             and ('data_pagamento' in attrs or 'comprovante_pagamento' in attrs)
@@ -410,6 +425,8 @@ class DespesaSerializer(serializers.ModelSerializer):
         )
 
         if status_pagamento == Despesa.StatusPagamento.PAGA:
+            # Pagamento sem data ou comprovante nao e aceito, pois a tela de
+            # financas depende dessa evidencia para mover a conta para pagas.
             if not data_pagamento:
                 raise serializers.ValidationError(
                     {'data_pagamento': 'Informe a data em que a conta foi paga.'}
@@ -424,6 +441,8 @@ class DespesaSerializer(serializers.ModelSerializer):
             attrs['quitada_por'] = None
 
         if self.instance and PagamentoDivisao.objects.filter(divisao__despesa=self.instance).exists():
+            # Depois de haver acertos aplicados, campos estruturais nao devem
+            # mudar para nao recalcular divisoes antigas de forma silenciosa.
             campos_sensiveis = {'valor_total', 'paga_por', 'republica'}
             if set(attrs.keys()) & campos_sensiveis:
                 raise serializers.ValidationError(
@@ -497,6 +516,8 @@ class PagamentoSerializer(serializers.ModelSerializer):
         }
 
     def _obter_divisoes_alvo(self, instance):
+        # Seleciona somente divisoes realmente relacionadas ao pagador,
+        # recebedor e republica do acerto.
         query = (
             DivisaoDespesa.objects.select_related('despesa', 'morador', 'despesa__quitada_por')
             .filter(
@@ -523,6 +544,8 @@ class PagamentoSerializer(serializers.ModelSerializer):
         aplicacoes = []
         total_disponivel = Decimal('0.00')
 
+        # O valor e aplicado das divisoes mais antigas para as mais novas,
+        # simulando um acerto organizado e previsivel entre moradores.
         for divisao in divisoes:
             disponivel = divisao.saldo_aberto + aplicacoes_atuais.get(divisao.id, Decimal('0.00'))
             if disponivel <= Decimal('0.00'):
@@ -574,6 +597,8 @@ class PagamentoSerializer(serializers.ModelSerializer):
         PagamentoDivisao.objects.bulk_create(itens)
 
     def _desfazer_pagamento(self, pagamento):
+        # Em uma edicao de pagamento, primeiro desfazemos o efeito anterior para
+        # recalcular o novo valor sem duplicar abatimentos.
         for item in pagamento.itens.select_related('divisao'):
             divisao = item.divisao
             divisao.valor_pago -= item.valor_aplicado
@@ -628,6 +653,8 @@ class TarefaSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'criada_em']
 
     def validate(self, attrs):
+        # Assim como moradores, tarefas nao podem ser movidas para outra republica
+        # por uma atualizacao enviada manualmente.
         if (
             self.instance
             and 'republica' in attrs
@@ -647,6 +674,8 @@ class TarefaSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         novo_status = validated_data.get('status', instance.status)
+        # A data de conclusao nasce quando a tarefa vira concluida e e limpa se
+        # ela voltar para um estado aberto.
         if novo_status == Tarefa.Status.CONCLUIDA and not validated_data.get('concluida_em'):
             validated_data['concluida_em'] = instance.concluida_em or timezone.now()
         if novo_status != Tarefa.Status.CONCLUIDA:

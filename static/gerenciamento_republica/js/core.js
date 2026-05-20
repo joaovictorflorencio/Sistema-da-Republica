@@ -14,6 +14,8 @@
   }
 
   function ensureAuthenticated() {
+    // Todas as telas internas dependem do token. Sem ele, o usuario volta para
+    // o login antes de qualquer chamada a API.
     if (!getToken()) {
       window.location.href = urls.login;
       return false;
@@ -57,6 +59,8 @@
   }
 
   async function apiFetch(url, options = {}) {
+    // Mantem a autenticacao e o formato JSON padronizados nas chamadas internas.
+    // Quando o corpo e FormData, o navegador define o Content-Type correto.
     const headers = {
       Authorization: `Token ${getToken()}`,
       ...(options.headers || {}),
@@ -72,6 +76,7 @@
       headers,
     });
     if (response.status === 401) {
+      // Token invalido ou expirado nao deve deixar a interface em estado confuso.
       localStorage.removeItem(tokenKey);
       window.location.href = urls.login;
       throw new Error("Sessao expirada");
@@ -124,6 +129,7 @@
   }
 
   function applyUserUI() {
+    // Atualiza cabecalho e menu lateral com os dados reais do usuario logado.
     const currentUser = state.currentUser;
     document.getElementById("header-user-name").textContent = currentUser.first_name || currentUser.username;
     const roleLabel = currentUser.morador_eh_admin ? "Admin da republica" : "Morador da republica";
@@ -160,11 +166,13 @@
   }
 
   async function loadCommonData() {
+    // Dados compartilhados por dashboard, financas, tarefas e perfil.
     const meResponse = await apiFetch(urls.authMe);
     state.currentUser = await meResponse.json();
     applyUserUI();
 
     if (!state.currentUser.republica_id) {
+      // O perfil ainda pode abrir sem republica para orientar o usuario.
       if (document.body.dataset.page === "perfil") {
         state.currentOverview = null;
         state.currentMoradores = [];
@@ -219,6 +227,7 @@
     if (!ensureAuthenticated()) return;
 
     try {
+      // Cada pagina recebe o mesmo contexto, evitando duplicacao de funcoes.
       bindModalEvents();
       await bindLogout();
       await loadCommonData();

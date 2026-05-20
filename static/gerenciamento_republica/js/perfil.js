@@ -1,5 +1,7 @@
 (function () {
   function renderProfile(ctx) {
+    // O perfil mostra dados simples do usuario; regras de republica ficam em
+    // login/cadastro para manter o fluxo principal mais claro.
     const { state } = ctx;
     const user = state.currentUser;
 
@@ -42,6 +44,8 @@
   }
 
   function getAdminTransferCandidates(ctx) {
+    // So aparecem como candidatos moradores ativos, com conta de usuario e
+    // diferentes do admin atual.
     const { state } = ctx;
     return state.currentMoradores.filter(
       (morador) =>
@@ -52,6 +56,8 @@
   }
 
   function fillAdminSelect(select, candidates, placeholder) {
+    // A mesma montagem de select e usada na transferencia direta e na exclusao
+    // de conta do administrador.
     if (!select) return;
     select.innerHTML = "";
 
@@ -76,6 +82,7 @@
     const submitButton = document.getElementById("perfil-transfer-admin-btn");
     if (!card || !select || !emptyMessage || !submitButton) return;
 
+    // O card de transferencia aparece somente para quem administra a republica.
     const canTransfer = Boolean(state.currentUser.republica_id && state.currentUser.morador_eh_admin);
     card.classList.toggle("hidden", !canTransfer);
     if (!canTransfer) return;
@@ -97,6 +104,7 @@
     const deleteButton = document.getElementById("perfil-delete-account-btn");
     if (!transferSection || !transferSelect || !confirmCheck || !deleteButton) return;
 
+    // Se o usuario e admin, a exclusao exige escolher um substituto antes.
     const needsAdminTransfer = Boolean(state.currentUser.republica_id && state.currentUser.morador_eh_admin);
     const candidates = getAdminTransferCandidates(ctx);
     transferSection.classList.toggle("hidden", !needsAdminTransfer);
@@ -116,6 +124,8 @@
     const deleteButton = document.getElementById("perfil-delete-account-btn");
     if (!confirmCheck || !transferSelect || !deleteButton) return;
 
+    // O botao so libera quando o usuario confirma a decisao e, se for admin,
+    // tambem escolhe quem assume a republica.
     const needsAdminTransfer = Boolean(state.currentUser.republica_id && state.currentUser.morador_eh_admin);
     const hasTransferTarget = !needsAdminTransfer || Boolean(transferSelect.value);
     deleteButton.disabled = !confirmCheck.checked || !hasTransferTarget;
@@ -127,6 +137,7 @@
     const form = event.currentTarget;
     const submitButton = form.querySelector("button[type='submit']");
 
+    // Atualizamos apenas o nome para evitar mudancas sensiveis pelo perfil.
     submitButton.disabled = true;
     submitButton.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Salvando...';
 
@@ -164,6 +175,7 @@
     const { apiFetch, urls, showToast } = ctx;
     const button = document.getElementById("perfil-leave-republica-btn");
 
+    // Sair da republica encerra a sessao para obrigar uma nova escolha no login.
     if (!window.confirm("Tem certeza que deseja sair desta republica? Seu historico antigo sera preservado.")) {
       return;
     }
@@ -192,6 +204,8 @@
   }
 
   async function transferAdmin(ctx, moradorId) {
+    // Atualiza o backend e depois reflete a troca localmente para a tela nao
+    // depender de recarregamento completo.
     const { apiFetch, urls, setCurrentUser, showToast } = ctx;
     const response = await apiFetch(urls.authTransferirAdmin, {
       method: "POST",
@@ -253,6 +267,8 @@
     button.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Excluindo...';
 
     try {
+      // Quando o usuario e admin, transferimos a administracao antes de remover
+      // a conta para nao deixar a republica sem responsavel.
       if (needsAdminTransfer) {
         if (!transferSelect.value) {
           showToast("Escolha quem assume como administrador antes de excluir sua conta.", "warning");
@@ -261,6 +277,7 @@
         await transferAdmin(ctx, transferSelect.value);
       }
 
+      // A exclusao final acontece no endpoint do proprio usuario autenticado.
       const response = await apiFetch(urls.authMe, { method: "DELETE" });
       const data = await response.json().catch(() => ({}));
 
