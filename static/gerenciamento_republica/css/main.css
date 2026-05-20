@@ -203,6 +203,48 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
   color: var(--accent);
 }
 .profile-republic-status strong { display: block; font-size: 1.05rem; color: var(--text-main); margin-bottom: 4px; }
+.profile-danger-card { border-color: rgba(255, 63, 52, 0.16); }
+.profile-danger-card .card-title i { color: var(--danger); }
+.profile-danger-badge { background: #fff5f5; color: var(--danger); }
+.profile-danger-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 63, 52, 0.18);
+  border-radius: var(--radius-md);
+  background: #fff8f8;
+  color: #991b1b;
+  line-height: 1.55;
+  font-size: 0.9em;
+}
+.profile-danger-note i { color: var(--danger); margin-top: 3px; }
+.profile-delete-transfer {
+  padding: 16px;
+  border: 1px solid rgba(0, 86, 254, 0.14);
+  border-radius: var(--radius-md);
+  background: #f8fbff;
+  margin-bottom: 18px;
+}
+.profile-confirm-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px 16px;
+  border: 1px solid rgba(255, 63, 52, 0.18);
+  border-radius: var(--radius-md);
+  background: #fff8f8;
+  color: #991b1b;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.profile-confirm-check input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--danger);
+  flex-shrink: 0;
+}
 .btn-danger-outline { border-color: rgba(255, 63, 52, 0.35); color: var(--danger); }
 .btn-danger-outline:hover { border-color: var(--danger); color: var(--danger); background: #fff5f5; }
 
@@ -216,6 +258,30 @@ body { font-family: 'Poppins', sans-serif; display: flex; height: 100vh; backgro
 .task-card.color-primary { border-left-color: var(--primary); }
 .task-card.color-accent { border-left-color: var(--accent); }
 .task-title { font-weight: 700; font-size: 0.95em; margin-bottom: 10px; line-height: 1.4; }
+.task-description {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.task-description i {
+  color: var(--primary);
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.task-history-details {
+  min-width: 0;
+  flex: 1;
+}
+.task-history-details .task-description {
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
 .task-card-footer { margin-top: 14px; display: flex; justify-content: flex-end; }
 .task-complete-btn { box-shadow: none; padding: 10px 14px; }
 .task-complete-btn:hover { box-shadow: 0 8px 18px rgba(5,196,107,0.25); }

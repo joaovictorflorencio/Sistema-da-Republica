@@ -578,6 +578,42 @@ class MeView(APIView):
         user = serializer.save()
         return Response(UsuarioSerializer(user).data)
 
+    @transaction.atomic
+    def delete(self, request):
+        user = request.user
+        morador = get_user_morador(user)
+
+        if morador:
+            republica = morador.republica
+            era_admin = morador.eh_admin
+            tem_substituto_admin = republica.moradores.filter(
+                ativo=True,
+                usuario__isnull=False,
+            ).exclude(pk=morador.pk).exists()
+
+            if era_admin and not tem_substituto_admin:
+                raise ValidationError(
+                    {
+                        'detail': (
+                            'Antes de excluir sua conta, vincule outro morador com conta de usuario '
+                            'para assumir como administrador.'
+                        )
+                    }
+                )
+
+            morador.usuario = None
+            morador.ativo = False
+            morador.eh_admin = False
+            morador.save(update_fields=['usuario', 'ativo', 'eh_admin'])
+
+            if era_admin:
+                promover_novo_admin_se_necessario(republica)
+
+        Token.objects.filter(user=user).delete()
+        logout(request)
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class SairRepublicaView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -614,6 +650,45 @@ class SairRepublicaView(APIView):
             promover_novo_admin_se_necessario(republica)
 
         return Response(serializar_usuario_atualizado(request.user))
+
+
+class TransferirAdminView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request):
+        morador_atual = get_user_morador(request.user)
+        if not morador_atual or not morador_atual.eh_admin:
+            raise PermissionDenied('Somente o administrador atual pode transferir a administracao.')
+
+        novo_admin_id = request.data.get('morador_id')
+        if not novo_admin_id:
+            raise ValidationError({'morador_id': 'Escolha o morador que vai assumir como administrador.'})
+
+        novo_admin = get_object_or_404(
+            Morador.objects.select_related('republica', 'usuario'),
+            pk=novo_admin_id,
+            republica=morador_atual.republica,
+            ativo=True,
+        )
+
+        if novo_admin.pk == morador_atual.pk:
+            raise ValidationError({'morador_id': 'Escolha outro morador para assumir a administracao.'})
+
+        if not novo_admin.usuario_id:
+            raise ValidationError({'morador_id': 'O novo administrador precisa ter uma conta de usuario vinculada.'})
+
+        Morador.objects.filter(republica=morador_atual.republica, eh_admin=True).update(eh_admin=False)
+        novo_admin.eh_admin = True
+        novo_admin.save(update_fields=['eh_admin'])
+
+        return Response(
+            {
+                'detail': 'Administracao transferida com sucesso.',
+                'novo_admin': MoradorSerializer(novo_admin).data,
+                'user': serializar_usuario_atualizado(request.user),
+            }
+        )
 
 
 class EntrarRepublicaView(APIView):

@@ -7,6 +7,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.test import override_settings
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from .models import Despesa, DivisaoDespesa, Morador, Pagamento, PagamentoDivisao, Republica, Tarefa
@@ -736,6 +737,227 @@ class AutenticacaoApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('detail', response.data)
+        admin_morador.refresh_from_db()
+        self.assertTrue(admin_morador.ativo)
+        self.assertEqual(admin_morador.usuario_id, admin.id)
+        self.assertTrue(admin_morador.eh_admin)
+
+    def test_admin_pode_transferir_administracao_para_morador_com_usuario(self):
+        admin = User.objects.create_user(
+            username='admin_transfere',
+            email='admin-transfere@example.com',
+            password='SenhaForte123',
+            first_name='Admin',
+        )
+        admin_morador = Morador.objects.create(
+            nome='Admin',
+            email=admin.email,
+            usuario=admin,
+            republica=self.republica,
+            eh_admin=True,
+        )
+        novo_admin_user = User.objects.create_user(
+            username='novo_admin',
+            email='novo-admin@example.com',
+            password='SenhaForte123',
+        )
+        novo_admin = Morador.objects.create(
+            nome='Novo Admin',
+            email='novo-admin-morador@example.com',
+            usuario=novo_admin_user,
+            republica=self.republica,
+            eh_admin=False,
+        )
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            '/api/auth/transferir-admin/',
+            {'morador_id': novo_admin.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        admin_morador.refresh_from_db()
+        novo_admin.refresh_from_db()
+        self.assertFalse(admin_morador.eh_admin)
+        self.assertTrue(novo_admin.eh_admin)
+        self.assertFalse(response.data['user']['morador_eh_admin'])
+
+    def test_transferir_admin_exige_morador_com_usuario_vinculado(self):
+        admin = User.objects.create_user(
+            username='admin_transferencia_sem_usuario',
+            email='admin-transferencia-sem-usuario@example.com',
+            password='SenhaForte123',
+            first_name='Admin',
+        )
+        admin_morador = Morador.objects.create(
+            nome='Admin',
+            email=admin.email,
+            usuario=admin,
+            republica=self.republica,
+            eh_admin=True,
+        )
+        candidato_sem_usuario = Morador.objects.create(
+            nome='Sem Usuario',
+            email='sem-usuario-admin@example.com',
+            republica=self.republica,
+            eh_admin=False,
+        )
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(
+            '/api/auth/transferir-admin/',
+            {'morador_id': candidato_sem_usuario.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('morador_id', response.data)
+        admin_morador.refresh_from_db()
+        candidato_sem_usuario.refresh_from_db()
+        self.assertTrue(admin_morador.eh_admin)
+        self.assertFalse(candidato_sem_usuario.eh_admin)
+
+    def test_usuario_comum_nao_pode_transferir_administracao(self):
+        user = User.objects.create_user(
+            username='nao_admin_transfere',
+            email='nao-admin-transfere@example.com',
+            password='SenhaForte123',
+        )
+        morador = Morador.objects.create(
+            nome='Nao Admin',
+            email=user.email,
+            usuario=user,
+            republica=self.republica,
+            eh_admin=False,
+        )
+        outro_user = User.objects.create_user(
+            username='outro_admin_candidato',
+            email='outro-admin-candidato@example.com',
+            password='SenhaForte123',
+        )
+        outro_morador = Morador.objects.create(
+            nome='Outro',
+            email='outro-admin-candidato-morador@example.com',
+            usuario=outro_user,
+            republica=self.republica,
+            eh_admin=False,
+        )
+        self.client.force_authenticate(user=user)
+
+        response = self.client.post(
+            '/api/auth/transferir-admin/',
+            {'morador_id': outro_morador.id},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        morador.refresh_from_db()
+        outro_morador.refresh_from_db()
+        self.assertFalse(morador.eh_admin)
+        self.assertFalse(outro_morador.eh_admin)
+
+    def test_usuario_pode_excluir_conta_preservando_historico(self):
+        user = User.objects.create_user(
+            username='excluir_login',
+            email='excluir@example.com',
+            password='SenhaForte123',
+            first_name='Excluir',
+        )
+        morador = Morador.objects.create(
+            nome='Excluir',
+            email=user.email,
+            usuario=user,
+            republica=self.republica,
+        )
+        Despesa.objects.create(
+            republica=self.republica,
+            titulo='Despesa historica',
+            descricao='Registro preservado',
+            categoria='OUTROS',
+            valor_total='42.00',
+            paga_por=morador,
+            data_despesa='2026-05-18',
+        )
+        token = Token.objects.create(user=user)
+        self.client.force_authenticate(user=user)
+
+        response = self.client.delete('/api/auth/me/')
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(username='excluir_login').exists())
+        self.assertFalse(Token.objects.filter(key=token.key).exists())
+        morador.refresh_from_db()
+        self.assertFalse(morador.ativo)
+        self.assertIsNone(morador.usuario)
+        self.assertEqual(morador.despesas_pagas.count(), 1)
+
+    def test_admin_pode_excluir_conta_quando_existe_substituto_com_usuario(self):
+        admin = User.objects.create_user(
+            username='admin_excluir',
+            email='admin-excluir@example.com',
+            password='SenhaForte123',
+            first_name='Admin',
+        )
+        admin_morador = Morador.objects.create(
+            nome='Admin',
+            email=admin.email,
+            usuario=admin,
+            republica=self.republica,
+            eh_admin=True,
+        )
+        substituto_user = User.objects.create_user(
+            username='substituto_excluir',
+            email='substituto-excluir@example.com',
+            password='SenhaForte123',
+        )
+        substituto = Morador.objects.create(
+            nome='Substituto',
+            email='substituto-excluir-morador@example.com',
+            usuario=substituto_user,
+            republica=self.republica,
+            eh_admin=False,
+        )
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.delete('/api/auth/me/')
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(username='admin_excluir').exists())
+        admin_morador.refresh_from_db()
+        substituto.refresh_from_db()
+        self.assertFalse(admin_morador.ativo)
+        self.assertIsNone(admin_morador.usuario)
+        self.assertFalse(admin_morador.eh_admin)
+        self.assertTrue(substituto.eh_admin)
+
+    def test_admin_nao_pode_excluir_conta_se_nao_houver_substituto_com_usuario(self):
+        admin = User.objects.create_user(
+            username='admin_excluir_sem_substituto',
+            email='admin-excluir-sem-substituto@example.com',
+            password='SenhaForte123',
+            first_name='Admin',
+        )
+        admin_morador = Morador.objects.create(
+            nome='Admin',
+            email=admin.email,
+            usuario=admin,
+            republica=self.republica,
+            eh_admin=True,
+        )
+        Morador.objects.create(
+            nome='Morador sem conta',
+            email='sem-conta-excluir@example.com',
+            republica=self.republica,
+            eh_admin=False,
+        )
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.delete('/api/auth/me/')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)
+        self.assertTrue(User.objects.filter(username='admin_excluir_sem_substituto').exists())
         admin_morador.refresh_from_db()
         self.assertTrue(admin_morador.ativo)
         self.assertEqual(admin_morador.usuario_id, admin.id)

@@ -16,6 +16,7 @@ from .views import (
     RepublicaViewSet,
     SairRepublicaView,
     TarefaViewSet,
+    TransferirAdminView,
     cadastro_page,
     dashboard_page,
     financas_page,
@@ -48,6 +49,7 @@ urlpatterns = [
     path('api/auth/me/', MeView.as_view(), name='me'),
     path('api/auth/sair-republica/', SairRepublicaView.as_view(), name='sair-republica'),
     path('api/auth/entrar-republica/', EntrarRepublicaView.as_view(), name='entrar-republica'),
+    path('api/auth/transferir-admin/', TransferirAdminView.as_view(), name='transferir-admin'),
     path('api/dashboard/overview/', DashboardOverviewView.as_view(), name='dashboard-overview'),
     path('api/republicas/<int:pk>/resumo-financeiro/', RepublicaResumoFinanceiroView.as_view(), name='resumo-financeiro'),
 ]

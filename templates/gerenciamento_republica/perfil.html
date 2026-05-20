@@ -111,10 +111,110 @@
         </button>
       </div>
     </section>
+
+    <section class="card profile-panel-card profile-admin-card hidden" id="perfil-transfer-admin-card">
+      <div class="profile-panel-header">
+        <div>
+          <span class="profile-panel-kicker">Administracao</span>
+          <h3 class="card-title"><i class="fa-solid fa-key"></i> Transferir admin</h3>
+        </div>
+        <span class="profile-soft-badge">Somente admin</span>
+      </div>
+
+      <p class="profile-panel-copy">
+        Passe a administracao para outro morador com conta vinculada antes de sair da republica ou excluir sua conta.
+      </p>
+
+      <form id="perfil-transfer-admin-form" class="profile-form">
+        <div class="form-group">
+          <label for="perfil-transfer-admin-select">Novo administrador</label>
+          <select class="form-control" id="perfil-transfer-admin-select" name="morador_id" required></select>
+        </div>
+
+        <div id="perfil-transfer-admin-empty" class="profile-form-note hidden">
+          <i class="fa-solid fa-circle-info"></i>
+          Nenhum outro morador com conta vinculada esta disponivel para assumir a administracao.
+        </div>
+
+        <div class="profile-actions">
+          <button type="submit" class="btn" id="perfil-transfer-admin-btn">
+            <i class="fa-solid fa-user-shield"></i>
+            Transferir administracao
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card profile-panel-card profile-danger-card">
+      <div class="profile-panel-header">
+        <div>
+          <span class="profile-panel-kicker">Conta</span>
+          <h3 class="card-title"><i class="fa-solid fa-user-xmark"></i> Excluir conta</h3>
+        </div>
+        <span class="profile-soft-badge profile-danger-badge">Irreversivel</span>
+      </div>
+
+      <p class="profile-panel-copy">
+        Excluir a conta remove seu acesso ao RABBU. O historico financeiro, tarefas e registros antigos permanecem preservados na republica.
+      </p>
+
+      <div class="profile-danger-note">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        Se voce for o unico administrador com conta vinculada, primeiro vincule outro morador para assumir a administracao.
+      </div>
+
+      <div class="profile-actions">
+        <button type="button" class="btn btn-outline btn-danger-outline" id="perfil-open-delete-account-modal-btn">
+          <i class="fa-solid fa-trash-can"></i>
+          Excluir minha conta
+        </button>
+      </div>
+    </section>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="{% static 'gerenciamento_republica/js/perfil.js' %}"></script>
+{% endblock %}
+
+{% block modals %}
+<div class="modal-overlay" id="modal-delete-account">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 style="margin: 0"><i class="fa-solid fa-user-xmark"></i> Excluir conta</h3>
+      <button class="btn-outline modal-close-btn" data-close-modal="modal-delete-account" aria-label="Fechar">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="modal-form-body">
+      <p class="profile-panel-copy">
+        Sua conta de login sera removida e voce sera desconectado. O historico da republica permanece preservado.
+      </p>
+
+      <div id="perfil-delete-admin-transfer-section" class="profile-delete-transfer hidden">
+        <div class="form-group">
+          <label for="perfil-delete-transfer-admin-select">Transferir administracao para</label>
+          <select class="form-control" id="perfil-delete-transfer-admin-select"></select>
+        </div>
+        <p class="helper-text">
+          Como voce e o administrador atual, escolha quem assume antes de excluir sua conta.
+        </p>
+      </div>
+
+      <label class="profile-confirm-check">
+        <input type="checkbox" id="perfil-delete-account-confirm-check" />
+        <span>Entendo que essa acao nao pode ser desfeita.</span>
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn btn-outline btn-danger-outline modal-submit-btn" id="perfil-delete-account-btn" disabled>
+        <i class="fa-solid fa-trash-can"></i>
+        Excluir conta
+      </button>
+    </div>
+  </div>
+</div>
 {% endblock %}

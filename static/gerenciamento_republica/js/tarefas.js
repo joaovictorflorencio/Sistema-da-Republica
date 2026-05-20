@@ -1,4 +1,27 @@
 (function () {
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function renderTaskDescription(tarefa) {
+    const descricao = String(tarefa.descricao || "").trim();
+    if (!descricao) {
+      return "";
+    }
+
+    return `
+      <p class="task-description">
+        <i class="fa-regular fa-note-sticky"></i>
+        <span>${escapeHtml(descricao)}</span>
+      </p>
+    `;
+  }
+
   async function renderTarefas(ctx) {
     const { apiFetch, renderList, fillSelect, formatDate, formatDateTime } = ctx;
     const response = await apiFetch("/api/tarefas/");
@@ -39,9 +62,10 @@
         div.innerHTML = `
           <div style="display:flex; gap:10px; align-items:flex-start;">
             <div style="flex:1;">
-              <div class="task-title">${tarefa.titulo}</div>
+              <div class="task-title">${escapeHtml(tarefa.titulo)}</div>
+              ${renderTaskDescription(tarefa)}
               <div class="task-meta">
-                <span><i class="fa-regular fa-user"></i> ${tarefa.responsavel_nome || "Sem responsavel"}</span>
+                <span><i class="fa-regular fa-user"></i> ${escapeHtml(tarefa.responsavel_nome || "Sem responsavel")}</span>
                 <span><i class="fa-regular fa-calendar"></i> ${formatDate(tarefa.data_limite)}</span>
               </div>
               <div class="task-actions">
@@ -72,10 +96,11 @@
         const div = document.createElement("div");
         div.className = "expense-item";
         div.innerHTML = `
-          <div>
-            <strong style="display:block;">${tarefa.titulo}</strong>
+          <div class="task-history-details">
+            <strong style="display:block;">${escapeHtml(tarefa.titulo)}</strong>
+            ${renderTaskDescription(tarefa)}
             <span class="helper-text">
-              ${tarefa.responsavel_nome || "Sem responsavel"} - concluida em ${formatDateTime(tarefa.concluida_em)}
+              ${escapeHtml(tarefa.responsavel_nome || "Sem responsavel")} - concluida em ${formatDateTime(tarefa.concluida_em)}
             </span>
           </div>
           <span class="badge badge-success">Concluida</span>
